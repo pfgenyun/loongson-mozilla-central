@@ -300,6 +300,8 @@ GetTopIonJSScript(uint8_t *ionTop, void **returnAddrOut, ExecutionMode mode)
 # include "jit/shared/IonFrames-x86-shared.h"
 #elif defined (JS_CPU_ARM)
 # include "jit/arm/IonFrames-arm.h"
+#elif defined (JS_CPU_MIPS)
+# include "jit/mips/IonFrames-mips.h"
 #else
 # error "unsupported architecture"
 #endif

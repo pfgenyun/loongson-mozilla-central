@@ -337,8 +337,8 @@ struct BaselineStackBuilder
         // so we can calculate it directly.  For other archs, the previous frame pointer
         // is stored on the stack in the frame that precedes the rectifier frame.
         size_t priorOffset = IonJSFrameLayout::Size() + topFrame->prevFrameLocalSize();
-#if defined(JS_CPU_X86)
-        // On X86, the FramePointer is pushed as the first value in the Rectifier frame.
+#if defined(JS_CPU_X86) || defined(JS_CPU_MIPS)
+        // On X86 and MIPS, the FramePointer is pushed as the first value in the Rectifier frame.
         JS_ASSERT(BaselineFrameReg == FramePointer);
         priorOffset -= sizeof(void *);
         return virtualPointerAtStackOffset(priorOffset);
