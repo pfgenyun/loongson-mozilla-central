@@ -27,7 +27,8 @@
 #ifndef assembler_assembler_MacroAssemblerMIPS_h
 #define assembler_assembler_MacroAssemblerMIPS_h
 
-#if ENABLE(ASSEMBLER) && CPU(MIPS)
+#include "assembler/wtf/Platform.h"
+#if ENABLE(ASSEMBLER) && WTF_CPU_MIPS 
 
 #include "assembler/assembler/AbstractMacroAssembler.h"
 #include "assembler/assembler/MIPSAssembler.h"
@@ -80,6 +81,8 @@ public:
     };
 
     enum DoubleCondition {
+        DoubleUnordered, 
+        DoubleOrdered,
         DoubleEqual,
         DoubleNotEqual,
         DoubleGreaterThan,
@@ -324,6 +327,14 @@ public:
         }
     }
 
+    void and32(TrustedImm32 imm, Address address)
+    {
+        move(imm, dataTempRegister);
+        load32(address, dataTemp2Register);
+        m_assembler.andInsn(dataTemp2Register, dataTemp2Register, dataTempRegister);
+        store32(dataTemp2Register, address);
+    }
+
     void lshift32(TrustedImm32 imm, RegisterID dest)
     {
         m_assembler.sll(dest, dest, imm.m_value);
@@ -337,6 +348,18 @@ public:
     void mul32(RegisterID src, RegisterID dest)
     {
         m_assembler.mul(dest, dest, src);
+    }
+
+    void mul32(Address src, RegisterID dest)
+    {
+        load32(src, dataTempRegister);
+        m_assembler.mul(dest, dest, dataTempRegister);
+    }
+
+    void mul32(TrustedImm32 src, RegisterID dest)
+    {
+        move(src, dataTempRegister);
+        m_assembler.mul(dest, dest, dataTempRegister);
     }
 
     void mul32(TrustedImm32 imm, RegisterID src, RegisterID dest)
@@ -360,9 +383,23 @@ public:
         m_assembler.subu(srcDest, MIPSRegisters::zero, srcDest);
     }
 
+    void neg32(Address srcDest)
+    {
+        load32(srcDest, dataTempRegister);
+        neg32(dataTempRegister);
+        store32(dataTempRegister, srcDest); 
+    }
+
     void not32(RegisterID srcDest)
     {
         m_assembler.nor(srcDest, srcDest, MIPSRegisters::zero);
+    }
+
+    void not32(Address srcDest)
+    {
+        load32(srcDest, dataTempRegister);
+        not32(dataTempRegister);
+        store32(dataTempRegister, srcDest);
     }
 
     void or32(Address src, RegisterID dest)
@@ -394,6 +431,14 @@ public:
         move(imm, dataTempRegister);
         m_assembler.orInsn(dest, dest, dataTempRegister);
     }
+
+    void or32(TrustedImm32 imm, Address address)
+    {
+        move(imm, dataTempRegister);
+        load32(address, dataTemp2Register);
+        m_assembler.orInsn(dataTemp2Register, dataTemp2Register, dataTempRegister);
+        store32(dataTemp2Register, address);
+    }   
 
     void rshift32(RegisterID shiftAmount, RegisterID dest)
     {
@@ -537,6 +582,19 @@ public:
         m_assembler.xorInsn(dest, dest, immTempRegister);
     }
 
+    void xor32(TrustedImm32 imm, Address address)
+    {
+        move(imm, dataTempRegister);
+        load32(address, dataTemp2Register);
+        m_assembler.xorInsn(dataTemp2Register, dataTemp2Register, dataTempRegister);
+        store32(dataTemp2Register, address);
+    }   
+
+    void load16Unaligned(BaseIndex address, RegisterID dest)
+    {
+        load16(address, dest);
+    }
+   
     void load16SignExtend(ImplicitAddress address, RegisterID dest)
     {
         if (address.offset >= -32768 && address.offset <= 32767
@@ -736,6 +794,11 @@ public:
         m_assembler.sqrtd(dst, src);
     }
 
+    void floorDouble(FPRegisterID src, FPRegisterID dst)
+    {
+        m_assembler.floorwd(dst, src);
+    }
+
     // Memory access operations:
     //
     // Loads are of the form load(address, destination) and stores of the form
@@ -759,6 +822,11 @@ public:
             m_assembler.addu(addrTempRegister, addrTempRegister, address.base);
             m_assembler.lbu(dest, addrTempRegister, address.offset);
         }
+    }
+
+    void load8(BaseIndex address, RegisterID dest)
+    {
+        load8ZeroExtend(address, dest);
     }
 
     void load32(ImplicitAddress address, RegisterID dest)
@@ -1444,8 +1512,10 @@ public:
 
     void push(TrustedImm32 imm)
     {
+        m_fixedWidth = true;
         move(imm, immTempRegister);
         push(immTempRegister);
+        m_fixedWidth = false;
     }
 
     // Register move operations:
@@ -1456,11 +1526,10 @@ public:
     {
         if (!imm.m_isPointer && !imm.m_value && !m_fixedWidth)
             move(MIPSRegisters::zero, dest);
-        else if (imm.m_isPointer || m_fixedWidth) {
+        else {
             m_assembler.lui(dest, imm.m_value >> 16);
             m_assembler.ori(dest, dest, imm.m_value);
-        } else
-            m_assembler.li(dest, imm.m_value);
+        } 
     }
 
     void move(RegisterID src, RegisterID dest)
@@ -1973,8 +2042,13 @@ public:
         return Call(m_assembler.newJmpSrc(), Call::Linkable);
     }
 
+    Call callRel();
+
     Call call(RegisterID target)
     {
+        // reserve space for patching
+        m_assembler.nop();
+        m_assembler.nop();
         m_assembler.jalr(target);
         m_assembler.nop();
         return Call(m_assembler.newJmpSrc(), Call::None);
@@ -1990,8 +2064,19 @@ public:
         return Call(m_assembler.newJmpSrc(), Call::None);
     }
 
+    void offsetFromPCToV0(int offset);
+
+    void skipOffsetFromPCToV0(int offset);
+
     void ret()
     {
+        m_assembler.jr(MIPSRegisters::ra);
+        m_assembler.nop();
+    }
+
+    void ret(int imm)
+    {
+        add32(TrustedImm32(imm), MIPSRegister::sp);
         m_assembler.jr(MIPSRegisters::ra);
         m_assembler.nop();
     }
@@ -2236,7 +2321,7 @@ public:
                 addu    addrTemp, addrTemp, base
                 lwc1    dest, (offset & 0xffff)(addrTemp)
                 cvt.d.s dest, dest
-              */
+            */
             m_assembler.lui(addrTempRegister, (address.offset + 0x8000) >> 16);
             m_assembler.addu(addrTempRegister, addrTempRegister, address.base);
             m_assembler.lwc1(dest, addrTempRegister, address.offset);
@@ -2515,6 +2600,12 @@ public:
         loadDouble(src, fpTempRegister);
         m_assembler.addd(dest, dest, fpTempRegister);
     }
+    
+    void addDouble(const void* src, FPRegisterID dest)
+    {
+        loadDouble(src, fpTempRegister);
+        m_assembler.addd(dest, dest, fpTempRegister);
+    }
 
     void subDouble(FPRegisterID src, FPRegisterID dest)
     {
@@ -2541,6 +2632,12 @@ public:
     void divDouble(FPRegisterID src, FPRegisterID dest)
     {
         m_assembler.divd(dest, dest, src);
+    }
+
+    void divDouble(Address src, FPRegisterID dest)
+    {
+        loadDouble(src, fpTempRegister);
+        m_assembler.divd(dest, dest, fpTempRegister);
     }
 
     void convertUInt32ToDouble(RegisterID src, FPRegisterID dest)
@@ -2579,6 +2676,13 @@ public:
     }
 
     void convertInt32ToDouble(Address src, FPRegisterID dest)
+    {
+        load32(src, dataTempRegister);
+        m_assembler.mtc1(dataTempRegister, fpTempRegister);
+        m_assembler.cvtdw(dest, fpTempRegister);
+    }
+
+    void convertInt32ToDouble(BaseIndex src, FPRegisterID dest)
     {
         load32(src, dataTempRegister);
         m_assembler.mtc1(dataTempRegister, fpTempRegister);
@@ -2664,8 +2768,21 @@ public:
         m_assembler.cvtsd(dest, src);
     }
 
+    void convertFloatToDouble(FPRegisterID src, FPRegisterID dest)
+    {
+        m_assembler.cvtds(dest, src);
+    }
+
     Jump branchDouble(DoubleCondition cond, FPRegisterID left, FPRegisterID right)
     {
+        if (cond == DoubleUnordered) {
+            m_assembler.cud(left, right);
+            return branchTrue();
+        }
+        if (cond == DoubleOrdered) {
+            m_assembler.cud(left, right);
+            return branchFalse();
+        }
         if (cond == DoubleEqual) {
             m_assembler.ceqd(left, right);
             return branchTrue();
@@ -2757,6 +2874,16 @@ public:
         m_assembler.mtc1(MIPSRegisters::zero, FPRegisterID(dest + 1));
 #endif
     }
+
+    //ion helper
+    void truncateDoubleToInt32(FPRegisterID src, RegisterID dest)
+    {
+        m_assembler.truncwd(fpTempRegister, src);
+        m_assembler.mfc1(dest, fpTempRegister);
+    }
+    
+public:
+    AssemblerType_T& assembler(){ return m_assembler; }
 
 private:
     // If m_fixedWidth is true, we will generate a fixed number of instructions.

@@ -112,7 +112,8 @@ typedef enum {
     gp = r28,
     sp = r29,
     fp = r30,
-    ra = r31
+    ra = r31,
+    invalid_reg
 } RegisterID;
 
 typedef enum {
@@ -147,7 +148,8 @@ typedef enum {
     f28,
     f29,
     f30,
-    f31
+    f31,
+    invalid_freg
 } FPRegisterID;
 
 } // namespace MIPSRegisters
@@ -180,12 +182,16 @@ public:
         {
         }
 
-    private:
         JmpSrc(int offset)
             : m_offset(offset)
         {
         }
 
+	int offset() { return m_offset; }
+	
+	bool isSet() const { return m_offset != -1; }
+
+    private:
         int m_offset;
     };
 
@@ -201,7 +207,7 @@ public:
         bool isUsed() const { return m_used; }
         void used() { m_used = true; }
         bool isValid() const { return m_offset != -1; }
-    private:
+
         JmpDst(int offset)
             : m_offset(offset)
             , m_used(false)
@@ -209,6 +215,9 @@ public:
             ASSERT(m_offset == offset);
         }
 
+	int offset() const { return m_offset; }
+
+    private:
         int m_offset : 31;
         int m_used : 1;
     };
@@ -509,6 +518,12 @@ public:
         int value = 512; /* BRK_BUG */
         emitInst(0x0000000d | ((value & 0x3ff) << OP_SH_CODE));
     }
+    
+    // xsb: fix me.
+    void bal(int imm)
+    {
+	emitInst(0x04110000 | (imm & 0xfffff));
+    }
 
     void bgez(RegisterID rs, int imm)
     {
@@ -626,6 +641,20 @@ public:
         copDelayNop();
     }
 
+    // by xsb: fix me
+    void dsrl32(RegisterID rt, RegisterID rd, int saminus32)
+    {
+        emitInst(0x0000003d | (rd << OP_SH_RD) | (rt << OP_SH_RT) | (saminus32 << OP_SH_SHAMT));
+        copDelayNop();
+    }
+
+    // by xsb: fix me
+    void dmfc1(RegisterID rt, FPRegisterID fs)
+    {
+        emitInst(0x44200000 | (fs << OP_SH_FS) | (rt << OP_SH_RT));
+        copDelayNop();
+    }
+
     void mfc1(RegisterID rt, FPRegisterID fs)
     {
         emitInst(0x44000000 | (fs << OP_SH_FS) | (rt << OP_SH_RT));
@@ -640,6 +669,12 @@ public:
     void truncwd(FPRegisterID fd, FPRegisterID fs)
     {
         emitInst(0x4620000d | (fd << OP_SH_FD) | (fs << OP_SH_FS));
+    }
+
+    // by xsb: fix me
+    void floorwd(FPRegisterID fd, FPRegisterID fs)
+    {
+        emitInst(0x4620000f | (fd << OP_SH_FD) | (fs << OP_SH_FS));
     }
 
     void cvtdw(FPRegisterID fd, FPRegisterID fs)
@@ -660,6 +695,13 @@ public:
     void cvtwd(FPRegisterID fd, FPRegisterID fs)
     {
         emitInst(0x46200024 | (fd << OP_SH_FD) | (fs << OP_SH_FS));
+    }
+
+    // by xsb: fix me
+    void cud(FPRegisterID fs, FPRegisterID ft)
+    {
+        emitInst(0x46200031 | (fs << OP_SH_FS) | (ft << OP_SH_FT));
+        copDelayNop();
     }
 
     void ceqd(FPRegisterID fs, FPRegisterID ft)
@@ -729,6 +771,9 @@ public:
         return JmpDst(m_buffer.size());
     }
 
+    // by xsb; fix me
+    size_t currentOffset() const { return m_buffer.size(); }
+
     JmpDst align(int alignment)
     {
         while (!m_buffer.isAligned(alignment))
@@ -787,6 +832,9 @@ public:
         relocateJumps(m_buffer.data(), result);
         return result;
     }
+
+    // by xsb; fix me
+    static void setRe132(void* from, void* to);
 
     static unsigned getCallReturnOffset(JmpSrc call)
     {
@@ -910,7 +958,37 @@ public:
         ExecutableAllocator::cacheFlush(insn, sizeof(MIPSWord));
     }
 
-private:
+    // Like Lua's emitter, we thread jump lists through the unpatched target
+    // field, which will get fixed up when the label (which has a pointer to
+    // the head of the jump list) is bound.
+    // by xsb; fix me.
+    bool nextJump(const JmpSrc& from, JmpSrc* next);
+
+    bool nextBranch(const JmpSrc& from, JmpSrc* next);
+
+    void setNextJump(const JmpSrc& from, const JmpSrc &to);
+
+    // by hwj
+    void clearOffsetForLabel(const JmpSrc& from);
+
+    // by wangqing
+    void linkBranch(JmpSrc from, JmpDst to);
+
+    static void *getRel32Target(void* where);
+
+    static void *getPointer(void* where);
+
+    static void **getPointerRef(void* where);
+
+    static void setRel32(void* from, void* to);
+
+    static void setPointer(void* where, const void* value);
+
+    static int32_t getInt32(void* where);
+
+    static void setInt32(void* where, int32_t value);
+
+//private:
 
     /* Update each jump in the buffer of newBase.  */
     void relocateJumps(void* oldBase, void* newBase)

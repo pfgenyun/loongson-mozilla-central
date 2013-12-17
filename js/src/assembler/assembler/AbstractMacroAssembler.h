@@ -420,7 +420,7 @@ public:
 
         bool isSet() const { return m_jmp.isSet(); }
 
-    private:
+	// modify private to public. by wangqing
         JmpSrc m_jmp;
     };
 
@@ -585,7 +585,8 @@ public:
         return AssemblerType::getDifferenceBetweenLabels(from.m_label, to.m_jmp);
     }
 
-protected:
+//xsb_fix: this should be public.
+public:
     AssemblerType m_assembler;
 
     friend class LinkBuffer;

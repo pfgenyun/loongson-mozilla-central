@@ -14,6 +14,8 @@
 # include "jit/x86/BaselineCompiler-x86.h"
 #elif defined(JS_CPU_X64)
 # include "jit/x64/BaselineCompiler-x64.h"
+#elif defined(JS_CPU_MIPS)
+# include "jit/mips/BaselineCompiler-mips.h"
 #else
 # include "jit/arm/BaselineCompiler-arm.h"
 #endif

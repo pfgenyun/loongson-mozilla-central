@@ -336,8 +336,13 @@ static bool IsSignalHandlingBroken() { return false; }
 static uint8_t **
 ContextToPC(CONTEXT *context)
 {
-    JS_STATIC_ASSERT(sizeof(PC_sig(context)) == sizeof(void*));
-    return reinterpret_cast<uint8_t**>(&PC_sig(context));
+    #if defined(JS_CPU_MIPS)
+    // xsb: fix me
+      return NULL;
+    #else
+      JS_STATIC_ASSERT(sizeof(PC_sig(context)) == sizeof(void*));
+      return reinterpret_cast<uint8_t**>(&PC_sig(context));
+    #endif
 }
 
 # if defined(JS_CPU_X64)
