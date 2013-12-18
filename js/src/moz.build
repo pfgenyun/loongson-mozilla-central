@@ -332,7 +332,6 @@ if CONFIG['ENABLE_ION']:
         ]
     elif CONFIG['TARGET_CPU'].find('mips') != -1:
         UNIFIED_SOURCES += [
-            'jit/mips/Architecture-mips.cpp',
             'jit/mips/Assembler-mips.cpp',
             'jit/mips/Bailouts-mips.cpp',
             'jit/mips/BaselineCompiler-mips.cpp',
@@ -364,9 +363,9 @@ if CONFIG['ENABLE_ION'] or CONFIG['ENABLE_YARR_JIT']:
     SOURCES += [
         'assembler/assembler/ARMAssembler.cpp',
         'assembler/assembler/MacroAssemblerARM.cpp',
-	'assembler/assembler/MIPSAssembler.cpp',
-	'assembler/assembler/MacroAssemblerMIPS.cpp',
+        'assembler/assembler/MacroAssemblerMIPS.cpp',
         'assembler/assembler/MacroAssemblerX86Common.cpp',
+        'assembler/assembler/MIPSAssembler.cpp',
     ]
 
 if CONFIG['ENABLE_YARR_JIT']:
