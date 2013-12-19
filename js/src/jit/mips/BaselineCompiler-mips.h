@@ -15,7 +15,7 @@ namespace jit {
 class BaselineCompilerMIPS : public BaselineCompilerShared
 {
   protected:
-    BaselineCompilerMIPS(JSContext *cx, HandleScript script);
+    BaselineCompilerMIPS(JSContext *cx, TempAllocator &alloc, HandleScript script);
 };
 
 typedef BaselineCompilerMIPS BaselineCompilerSpecific;

@@ -1,14 +1,14 @@
-/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=4 sw=4 et tw=99:
- *
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
+ * vim: set ts=8 sts=4 et sw=4 tw=99:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "jscntxt.h"
 #include "jscompartment.h"
+
 #include "jit/Bailouts.h"
-#include "jit/IonCompartment.h"
+#include "jit/JitCompartment.h"
 #include "jit/IonFrames-inl.h"
 
 using namespace js;
@@ -24,14 +24,13 @@ namespace jit {
 class BailoutStack
 {
     uintptr_t frameClassId_;
-  //  uintptr_t padding;  //NOTE:this is deleted in ff24
-    double    fpregs_[FloatRegisters::Total];
-    uintptr_t regs_[Registers::Total];
+    mozilla::Array<double, FloatRegisters::Total> fpregs_;
+    mozilla::Array<uintptr_t, Registers::Total> regs_;
     union {
         uintptr_t frameSize_;
         uintptr_t tableOffset_;
     };
-    uintptr_t snapshotOffset_;//maybe unaligned
+    uintptr_t snapshotOffset_;
 
   public:
     FrameSizeClass frameClass() const {
@@ -53,7 +52,7 @@ class BailoutStack
         JS_ASSERT(frameClass() == FrameSizeClass::None());
         return snapshotOffset_;
     }
-    uint8_t  *parentStackPointer() const {
+    uint8_t *parentStackPointer() const {
         if (frameClass() == FrameSizeClass::None())
             return (uint8_t *)this + sizeof(BailoutStack);
         return (uint8_t *)this + offsetof(BailoutStack, snapshotOffset_);
@@ -72,27 +71,23 @@ IonBailoutIterator::IonBailoutIterator(const JitActivationIterator &activations,
   : IonFrameIterator(activations),
     machine_(bailout->machine())
 {
-    uint8_t *sp = bailout->parentStackPointer();//off of snapshotOffset_
+    uint8_t *sp = bailout->parentStackPointer();
     uint8_t *fp = sp + bailout->frameSize();
 
     current_ = fp;
     type_ = IonFrame_OptimizedJS;
     topFrameSize_ = current_ - sp;
-   // NOTE: This is update in ff24
-  //  topIonScript_ = script()->ion;
-	topIonScript_ = script()->ionScript();
-	
+    topIonScript_ = script()->ionScript();
+
     if (bailout->frameClass() == FrameSizeClass::None()) {
         snapshotOffset_ = bailout->snapshotOffset();
         return;
     }
 
     // Compute the snapshot offset from the bailout ID.
-    //Activation *activation = activations.activation();// NOTE: This is update in ff24
     JitActivation *activation = activations.activation()->asJit();
-    JSCompartment *jsCompartment = activation->compartment();
-    IonCompartment *ionCompartment = jsCompartment->ionCompartment();
-    IonCode *code = ionCompartment->getBailoutTable(bailout->frameClass());
+    JSRuntime *rt = activation->compartment()->runtimeFromMainThread();
+    IonCode *code = rt->jitRuntime()->getBailoutTable(bailout->frameClass());
     uintptr_t tableOffset = bailout->tableOffset();
     uintptr_t tableStart = reinterpret_cast<uintptr_t>(code->raw());
 
@@ -120,4 +115,3 @@ IonBailoutIterator::IonBailoutIterator(const JitActivationIterator &activations,
     topFrameSize_ = current_ - bailout->sp();
     snapshotOffset_ = osiIndex->snapshotOffset();
 }
-

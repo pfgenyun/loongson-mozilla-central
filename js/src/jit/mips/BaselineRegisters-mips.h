@@ -14,25 +14,25 @@
 namespace js {
 namespace jit {
 
-static const Register BaselineFrameReg = fp;
-static const Register BaselineStackReg = sp;
+static MOZ_CONSTEXPR_VAR Register BaselineFrameReg = fp;
+static MOZ_CONSTEXPR_VAR Register BaselineStackReg = sp;
 
 // ValueOperands R0, R1, and R2
-static const ValueOperand R0(v1, v0);
-static const ValueOperand R1(s1, s0);
-static const ValueOperand R2(t7, t6);
+static MOZ_CONSTEXPR_VAR ValueOperand R0(v1, v0);
+static MOZ_CONSTEXPR_VAR ValueOperand R1(s1, s0);
+static MOZ_CONSTEXPR_VAR ValueOperand R2(t7, t6);
 
 // BaselineTailCallReg and BaselineStubReg reuse
 // registers from R2.
-static const Register BaselineTailCallReg = t6;
-static const Register BaselineStubReg     = t7;
+static MOZ_CONSTEXPR_VAR Register BaselineTailCallReg = t6;
+static MOZ_CONSTEXPR_VAR Register BaselineStubReg     = t7;
 
-static const Register ExtractTemp0        = InvalidReg;
-static const Register ExtractTemp1        = InvalidReg;
+static MOZ_CONSTEXPR_VAR Register ExtractTemp0        = InvalidReg;
+static MOZ_CONSTEXPR_VAR Register ExtractTemp1        = InvalidReg;
 
 // FloatReg0 must be equal to ReturnFloatReg.
-static const FloatRegister FloatReg0      = f0;
-static const FloatRegister FloatReg1      = f2;
+static MOZ_CONSTEXPR_VAR FloatRegister FloatReg0      = f0;
+static MOZ_CONSTEXPR_VAR FloatRegister FloatReg1      = f2;
 
 } // namespace jit
 } // namespace js

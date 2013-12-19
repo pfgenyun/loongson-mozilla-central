@@ -4,10 +4,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "jit/BaselineJIT.h"
-#include "jit/BaselineIC.h"
 #include "jit/BaselineCompiler.h"
 #include "jit/BaselineHelpers.h"
+#include "jit/BaselineIC.h"
+#include "jit/BaselineJIT.h"
 #include "jit/IonLinker.h"
 
 using namespace js;
@@ -16,6 +16,7 @@ using namespace js::jit;
 namespace js {
 namespace jit {
 
+//from jit/shared/BaselineIC-x86-shared.cpp
 bool
 ICCompare_Double::Compiler::generateStubCode(MacroAssembler &masm)
 {
@@ -26,7 +27,7 @@ ICCompare_Double::Compiler::generateStubCode(MacroAssembler &masm)
     Register dest = R0.scratchReg();
 
     Assembler::DoubleCondition cond = JSOpToDoubleCondition(op);
-    masm.xorl(dest, dest);
+    masm.mov(ImmWord(0), dest);
     masm.compareDouble(cond, FloatReg0, FloatReg1);
     masm.setCC(Assembler::ConditionFromDoubleCondition(cond), dest);
 
@@ -34,7 +35,7 @@ ICCompare_Double::Compiler::generateStubCode(MacroAssembler &masm)
     Assembler::NaNCond nanCond = Assembler::NaNCondFromDoubleCondition(cond);
     if (nanCond != Assembler::NaN_HandledByCond) {
       masm.j(Assembler::NoParity, &notNaN);
-      masm.mov(Imm32(nanCond == Assembler::NaN_IsTrue), dest);
+      masm.mov(ImmWord(nanCond == Assembler::NaN_IsTrue), dest);
       masm.bind(&notNaN);
     }
 
@@ -47,6 +48,8 @@ ICCompare_Double::Compiler::generateStubCode(MacroAssembler &masm)
     return true;
 }
 
+
+//from jit/x86/BaselineIC-x86.cpp
 // ICCompare_Int32
 
 bool
@@ -61,7 +64,7 @@ ICCompare_Int32::Compiler::generateStubCode(MacroAssembler &masm)
     Assembler::Condition cond = JSOpToCondition(op, /* signed = */true);
     masm.cmpl(R0.payloadReg(), R1.payloadReg());
     masm.setCC(cond, R0.payloadReg());
-    masm.movzxbl(R0.payloadReg(), R0.payloadReg());
+    masm.movzbl(R0.payloadReg(), R0.payloadReg());
 
     // Box the result and return
     masm.tagValue(JSVAL_TYPE_BOOLEAN, R0.payloadReg(), R0);
@@ -88,8 +91,6 @@ ICBinaryArith_Int32::Compiler::generateStubCode(MacroAssembler &masm)
     Register scratchReg = BaselineTailCallReg;
 
     Label revertRegister, maybeNegZero;
-//xsb:fix me
-#if 0
     switch(op_) {
       case JSOP_ADD:
         // Add R0 and R1.  Don't need to explicitly unbox.
@@ -218,9 +219,8 @@ ICBinaryArith_Int32::Compiler::generateStubCode(MacroAssembler &masm)
         break;
       default:
        MOZ_ASSUME_UNREACHABLE("Unhandled op for BinaryArith_Int32.  ");
-       return false;
     }
-#endif
+
     // Return.
     EmitReturnFromIC(masm);
 
@@ -234,7 +234,7 @@ ICBinaryArith_Int32::Compiler::generateStubCode(MacroAssembler &masm)
         masm.j(Assembler::Signed, &failure);
 
         // Result is +0.
-        masm.xorl(R0.payloadReg(), R0.payloadReg());
+        masm.mov(ImmWord(0), R0.payloadReg());
         EmitReturnFromIC(masm);
         break;
       case JSOP_DIV:
@@ -280,7 +280,6 @@ ICUnaryArith_Int32::Compiler::generateStubCode(MacroAssembler &masm)
         break;
       default:
         MOZ_ASSUME_UNREACHABLE("Unexpected op");
-        return false;
     }
 
     EmitReturnFromIC(masm);
