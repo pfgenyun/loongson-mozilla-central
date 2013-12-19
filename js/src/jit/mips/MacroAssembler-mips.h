@@ -33,29 +33,38 @@ class MacroAssemblerMIPS : public Assembler
     bool dynamicAlignment_;
     bool enoughMemory_;
 
-//NOTE*:this is new in ff24
     struct Double {
         double value;
         AbsoluteLabel uses;
         Double(double value) : value(value) {}
     };
-    Vector<Double, 0, SystemAllocPolicy> doubles_; //this is only used in loadConstantDouble() and finish();
+    Vector<Double, 0, SystemAllocPolicy> doubles_;
+    struct Float {
+        float value;
+        AbsoluteLabel uses;
+        Float(float value) : value(value) {}
+    };
+    Vector<Float, 0, SystemAllocPolicy> floats_;
 
     typedef HashMap<double, size_t, DefaultHasher<double>, SystemAllocPolicy> DoubleMap;
     DoubleMap doubleMap_;
-    
-    
+    typedef HashMap<float, size_t, DefaultHasher<float>, SystemAllocPolicy> FloatMap;
+    FloatMap floatMap_;
+
+    Double *getDouble(double d);
+    Float *getFloat(float f);
+
   protected:
     MoveResolver moveResolver_;
 
   private:
-    Operand payloadOf(const Address &address) {  //获取到address所指向的操作数的payload域
+    Operand payloadOf(const Address &address) {
         return Operand(address.base, address.offset);
     }
-    Operand tagOf(const Address &address) {//为地址生成一个tag，使用的时候都用在compare类的指令时，应该是用于标记跳转的地址
-        return Operand(address.base, address.offset + 4);//一般和payloadof一起使用，表明紧接着payload域存放
+    Operand tagOf(const Address &address) {
+        return Operand(address.base, address.offset + 4);
     }
-    Operand tagOf(const BaseIndex &address) {//TBD BaseIndex special treat 获取到BaseIndex的tag域
+    Operand tagOf(const BaseIndex &address) {
         return Operand(address.base, address.index, address.scale, address.offset + 4);
     }
 
@@ -65,18 +74,14 @@ class MacroAssemblerMIPS : public Assembler
 
     enum Result {
         GENERAL,
-        DOUBLE
+        DOUBLE,
+        FLOAT
     };
 
-    typedef MoveResolver::MoveOperand MoveOperand;
-    typedef MoveResolver::Move Move;
-
-//NOTE*:this is new in ff24
     // The buffer is about to be linked, make sure any constant pools or excess
     // bookkeeping has been flushed to the instruction stream.
     void finish();
-    
-    
+
     bool oom() const {
         return Assembler::oom() || !enoughMemory_;
     }
@@ -85,58 +90,68 @@ class MacroAssemblerMIPS : public Assembler
     // X86-specific interface.
     /////////////////////////////////////////////////////////////////
 
-    Operand ToPayload(Operand base) { //获取地址操作数
+    Operand ToPayload(Operand base) {
         return base;
     }
     Operand ToType(Operand base) {
         switch (base.kind()) {
-          case Operand::REG_DISP:
+          case Operand::MEM_REG_DISP:
             return Operand(Register::FromCode(base.base()), base.disp() + sizeof(void *));
 
-          case Operand::SCALE:
+          case Operand::MEM_SCALE:
             return Operand(Register::FromCode(base.base()), Register::FromCode(base.index()),
                            base.scale(), base.disp() + sizeof(void *));
 
           default:
-            JS_NOT_REACHED("unexpected operand kind");
-            return base; // Silence GCC warning.
+            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
-    void moveValue(const Value &val, Register type, Register data) {//将一个boxed的值移动到寄存器，boxed值的高32位存放的是存储类型编码type，低32位存放实际的数据data
+    void moveValue(const Value &val, Register type, Register data) {
         jsval_layout jv = JSVAL_TO_IMPL(val);
-        movl(Imm32(jv.s.tag), type);//生成一个立即数到寄存器的move指令
+        movl(Imm32(jv.s.tag), type);
         if (val.isMarkable())
-            movl(ImmGCPtr(reinterpret_cast<gc::Cell *>(val.toGCThing())), data);//根据对象的不同生成move指令或者store指令
+            movl(ImmGCPtr(reinterpret_cast<gc::Cell *>(val.toGCThing())), data);
         else
             movl(Imm32(jv.s.payload.i32), data);
     }
-    void moveValue(const Value &val, const ValueOperand &dest) {//ValueOperand 其成员变量为两个Register的对象，用于存放一个boxed的值，一个boxed的值用一个64位的寄存器或者两个32位的寄存器来表示，
-
-																				//tag和payload。使用typeReg来获取tag，用payloadReg来获取payload
+    void moveValue(const Value &val, const ValueOperand &dest) {
         moveValue(val, dest.typeReg(), dest.payloadReg());
     }
-//NOTE*:this is new in ff24
     void moveValue(const ValueOperand &src, const ValueOperand &dest) {
-        JS_ASSERT(src.typeReg() != dest.payloadReg());
-        JS_ASSERT(src.payloadReg() != dest.typeReg());
-        if (src.typeReg() != dest.typeReg())
-            movl(src.typeReg(), dest.typeReg());
-        if (src.payloadReg() != dest.payloadReg())
-            movl(src.payloadReg(), dest.payloadReg());
+        Register s0 = src.typeReg(), d0 = dest.typeReg(),
+                 s1 = src.payloadReg(), d1 = dest.payloadReg();
+
+        // Either one or both of the source registers could be the same as a
+        // destination register.
+        if (s1 == d0) {
+            if (s0 == d1) {
+                // If both are, this is just a swap of two registers.
+                xchgl(d0, d1);
+                return;
+            }
+            // If only one is, copy that source first.
+            mozilla::Swap(s0, s1);
+            mozilla::Swap(d0, d1);
+        }
+
+        if (s0 != d0)
+            movl(s0, d0);
+        if (s1 != d1)
+            movl(s1, d1);
     }
 
     /////////////////////////////////////////////////////////////////
     // X86/X64-common interface.
     /////////////////////////////////////////////////////////////////
-    void storeValue(ValueOperand val, Operand dest) {//将一个boxed的值存放至内存
-        movl(val.payloadReg(), ToPayload(dest));//先存payload
-        movl(val.typeReg(), ToType(dest));//再存放tag域
+    void storeValue(ValueOperand val, Operand dest) {
+        movl(val.payloadReg(), ToPayload(dest));
+        movl(val.typeReg(), ToType(dest));
     }
     void storeValue(ValueOperand val, const Address &dest) {
         storeValue(val, Operand(dest));
     }
     template <typename T>
-    void storeValue(JSValueType type, Register reg, const T &dest) {//JSValueType为一个1个字节大小，用于存放JS执行时数据的类型
+    void storeValue(JSValueType type, Register reg, const T &dest) {
         storeTypeTag(ImmTag(JSVAL_TYPE_TO_TAG(type)), Operand(dest));
         storePayload(reg, Operand(dest));
     }
@@ -146,17 +161,17 @@ class MacroAssemblerMIPS : public Assembler
         storeTypeTag(ImmTag(jv.s.tag), Operand(dest));
         storePayload(val, Operand(dest));
     }
-    void storeValue(ValueOperand val, BaseIndex dest) {//TBD BaseIndex special treat
+    void storeValue(ValueOperand val, BaseIndex dest) {
         storeValue(val, Operand(dest));
     }
-    void loadValue(Operand src, ValueOperand val) {//从内存中取出一个值，正确的区分payload域和type域，存放至ValueOperand中
+    void loadValue(Operand src, ValueOperand val) {
         Operand payload = ToPayload(src);
         Operand type = ToType(src);
 
         // Ensure that loading the payload does not erase the pointer to the
         // Value in memory or the index.
         Register baseReg = Register::FromCode(src.base());
-        Register indexReg = (src.kind() == Operand::SCALE) ? Register::FromCode(src.index()) : InvalidReg;
+        Register indexReg = (src.kind() == Operand::MEM_SCALE) ? Register::FromCode(src.index()) : InvalidReg;
 
         if (baseReg == val.payloadReg() || indexReg == val.payloadReg()) {
             JS_ASSERT(baseReg != val.typeReg());
@@ -175,16 +190,16 @@ class MacroAssemblerMIPS : public Assembler
     void loadValue(Address src, ValueOperand val) {
         loadValue(Operand(src), val);
     }
-    void loadValue(const BaseIndex &src, ValueOperand val) {//TBD BaseIndex special treat
+    void loadValue(const BaseIndex &src, ValueOperand val) {
         loadValue(Operand(src), val);
     }
-    void tagValue(JSValueType type, Register payload, ValueOperand dest) {//将payload的值打上tag，包装成ValueOperand
-        JS_ASSERT(payload != dest.typeReg());
-        movl(ImmType(type), dest.typeReg());
+    void tagValue(JSValueType type, Register payload, ValueOperand dest) {
+        JS_ASSERT(dest.typeReg() != dest.payloadReg());
         if (payload != dest.payloadReg())
             movl(payload, dest.payloadReg());
+        movl(ImmType(type), dest.typeReg());
     }
-    void pushValue(ValueOperand val) {//将一个boxed的值压栈
+    void pushValue(ValueOperand val) {
         push(val.typeReg());
         push(val.payloadReg());
     }
@@ -192,7 +207,7 @@ class MacroAssemblerMIPS : public Assembler
         pop(val.payloadReg());
         pop(val.typeReg());
     }
-    void pushValue(const Value &val) {//将一个Value类型压栈，Value为JS执行时使用的对象，包括多个类型，可通过 JSVAL_TO_IMPL(val)来获取类型信息
+    void pushValue(const Value &val) {
         jsval_layout jv = JSVAL_TO_IMPL(val);
         push(Imm32(jv.s.tag));
         if (val.isMarkable())
@@ -204,12 +219,18 @@ class MacroAssemblerMIPS : public Assembler
         push(ImmTag(JSVAL_TYPE_TO_TAG(type)));
         push(reg);
     }
-    //NOTE*:this is new in ff24
-        void pushValue(const Address &addr) {
+    void pushValue(const Address &addr) {
         push(tagOf(addr));
         push(payloadOf(addr));
-    }  
-    
+    }
+    void Push(const ValueOperand &val) {
+        pushValue(val);
+        framePushed_ += sizeof(Value);
+    }
+    void Pop(const ValueOperand &val) {
+        popValue(val);
+        framePushed_ -= sizeof(Value);
+    }
     void storePayload(const Value &val, Operand dest) {
         jsval_layout jv = JSVAL_TO_IMPL(val);
         if (val.isMarkable())
@@ -227,33 +248,31 @@ class MacroAssemblerMIPS : public Assembler
     void movePtr(const Register &src, const Register &dest) {
         movl(src, dest);
     }
-    //NOTE*:this is new in ff24
     void movePtr(const Register &src, const Operand &dest) {
         movl(src, dest);
     }
-    
-        // Returns the register containing the type tag.仅返回类型标签的寄存器
+
+    // Returns the register containing the type tag.
     Register splitTagForTest(const ValueOperand &value) {
         return value.typeReg();
     }
 
-//这些test函数都用于检测数据的标签
-    Condition testUndefined(Condition cond, const Register &tag) {//用于测试标签是否被定义
+    Condition testUndefined(Condition cond, const Register &tag) {
         JS_ASSERT(cond == Equal || cond == NotEqual);
         cmpl(tag, ImmTag(JSVAL_TAG_UNDEFINED));
         return cond;
     }
-    Condition testBoolean(Condition cond, const Register &tag) {//用于测试标签是否为bool型
+    Condition testBoolean(Condition cond, const Register &tag) {
         JS_ASSERT(cond == Equal || cond == NotEqual);
         cmpl(tag, ImmTag(JSVAL_TAG_BOOLEAN));
         return cond;
     }
-    Condition testInt32(Condition cond, const Register &tag) {//测试标签是否为int32型
+    Condition testInt32(Condition cond, const Register &tag) {
         JS_ASSERT(cond == Equal || cond == NotEqual);
         cmpl(tag, ImmTag(JSVAL_TAG_INT32));
         return cond;
     }
-    Condition testDouble(Condition cond, const Register &tag) { //?
+    Condition testDouble(Condition cond, const Register &tag) {
         JS_ASSERT(cond == Assembler::Equal || cond == Assembler::NotEqual);
         Condition actual = (cond == Equal) ? Below : AboveOrEqual;
         cmpl(tag, ImmTag(JSVAL_TAG_CLEAR));
@@ -274,7 +293,7 @@ class MacroAssemblerMIPS : public Assembler
         cmpl(tag, ImmTag(JSVAL_TAG_OBJECT));
         return cond;
     }
-    Condition testNumber(Condition cond, const Register &tag) { //?
+    Condition testNumber(Condition cond, const Register &tag) {
         JS_ASSERT(cond == Equal || cond == NotEqual);
         cmpl(tag, ImmTag(JSVAL_UPPER_INCL_TAG_OF_NUMBER_SET));
         return cond == Equal ? BelowOrEqual : Above;
@@ -289,33 +308,21 @@ class MacroAssemblerMIPS : public Assembler
         cmpl(tagOf(address), ImmTag(JSVAL_LOWER_INCL_TAG_OF_GCTHING_SET));
         return cond == Equal ? AboveOrEqual : Below;
     }
- /*   Condition testGCThing(Condition cond, const BaseIndex &address) {//TBD BaseIndex special treat
-        JS_ASSERT(cond == Equal || cond == NotEqual);
-        cmpl(tagOf(address), ImmTag(JSVAL_LOWER_INCL_TAG_OF_GCTHING_SET));
-        return cond == Equal ? AboveOrEqual : Below;
-    }*/
     Condition testMagic(Condition cond, const Address &address) {
         JS_ASSERT(cond == Equal || cond == NotEqual);
         cmpl(tagOf(address), ImmTag(JSVAL_TAG_MAGIC));
         return cond;
     }
-    
-/*    Condition testMagic(Condition cond, const BaseIndex &address) {//TBD BaseIndex special treat
-        JS_ASSERT(cond == Equal || cond == NotEqual);
-        cmpl(tagOf(address), ImmTag(JSVAL_TAG_MAGIC));
-        return cond;
-    }*/
-        Condition testMagic(Condition cond, const Register &tag) {
+    Condition testMagic(Condition cond, const Register &tag) {
         JS_ASSERT(cond == Equal || cond == NotEqual);
         cmpl(tag, ImmTag(JSVAL_TAG_MAGIC));
         return cond;
-            }
-           //NOTE*:this is new in ff24     
-            Condition testMagic(Condition cond, const Operand &operand) {
+    }
+    Condition testMagic(Condition cond, const Operand &operand) {
         JS_ASSERT(cond == Equal || cond == NotEqual);
         cmpl(ToType(operand), ImmTag(JSVAL_TAG_MAGIC));
         return cond;
-    }     
+    }
     Condition testPrimitive(Condition cond, const Register &tag) {
         JS_ASSERT(cond == Equal || cond == NotEqual);
         cmpl(tag, ImmTag(JSVAL_UPPER_EXCL_TAG_OF_PRIMITIVE_SET));
@@ -329,73 +336,32 @@ class MacroAssemblerMIPS : public Assembler
         cmpl(ToType(operand), ImmTag(JSVAL_TAG_INT32));
         return cond;
     }
-//NOTE*:Following is new in ff24
-Condition testUndefined(Condition cond, const BaseIndex &address) {
-        JS_ASSERT(cond == Equal || cond == NotEqual);
-        cmpl(tagOf(address), ImmTag(JSVAL_TAG_UNDEFINED));
-        return cond;
-    }
-    Condition testNull(Condition cond, const BaseIndex &address) {
-        JS_ASSERT(cond == Equal || cond == NotEqual);
-        cmpl(tagOf(address), ImmTag(JSVAL_TAG_NULL));
-        return cond;
-    }
-    Condition testBoolean(Condition cond, const BaseIndex &address) {
-        JS_ASSERT(cond == Equal || cond == NotEqual);
-        cmpl(tagOf(address), ImmTag(JSVAL_TAG_BOOLEAN));
-        return cond;
-    }
-    Condition testString(Condition cond, const BaseIndex &address) {
-        JS_ASSERT(cond == Equal || cond == NotEqual);
-        cmpl(tagOf(address), ImmTag(JSVAL_TAG_STRING));
-        return cond;
-    }
-    Condition testInt32(Condition cond, const BaseIndex &address) {
-        JS_ASSERT(cond == Equal || cond == NotEqual);
-        cmpl(tagOf(address), ImmTag(JSVAL_TAG_INT32));
-        return cond;
-    }
-  Condition testObject(Condition cond, const BaseIndex &address) {
-        JS_ASSERT(cond == Equal || cond == NotEqual);
-        cmpl(tagOf(address), ImmTag(JSVAL_TAG_OBJECT));
-        return cond;
-    }
-    Condition testDouble(Condition cond, const BaseIndex &address) {
-        JS_ASSERT(cond == Equal || cond == NotEqual);
-        Condition actual = (cond == Equal) ? Below : AboveOrEqual;
-        cmpl(tagOf(address), ImmTag(JSVAL_TAG_CLEAR));
-        return actual;
-    }
-    Condition testMagic(Condition cond, const BaseIndex &address) {
-        JS_ASSERT(cond == Equal || cond == NotEqual);
-        cmpl(tagOf(address), ImmTag(JSVAL_TAG_MAGIC));
-        return cond;
-    }
-    Condition testGCThing(Condition cond, const BaseIndex &address) {
-        JS_ASSERT(cond == Equal || cond == NotEqual);
-        cmpl(tagOf(address), ImmTag(JSVAL_LOWER_INCL_TAG_OF_GCTHING_SET));
-        return cond == Equal ? AboveOrEqual : Below;
-    }
-
-       //NOTE*:this is new in ff24   
-        Condition testInt32(Condition cond, const Address &address) {
+    Condition testInt32(Condition cond, const Address &address) {
         JS_ASSERT(cond == Equal || cond == NotEqual);
         return testInt32(cond, Operand(address));
     }
-       //NOTE*:this is new in ff24   
     Condition testDouble(Condition cond, const Operand &operand) {
         JS_ASSERT(cond == Equal || cond == NotEqual);
         Condition actual = (cond == Equal) ? Below : AboveOrEqual;
         cmpl(ToType(operand), ImmTag(JSVAL_TAG_CLEAR));
         return actual;
     }
-       //NOTE*:this is new in ff24   
     Condition testDouble(Condition cond, const Address &address) {
         JS_ASSERT(cond == Equal || cond == NotEqual);
         return testDouble(cond, Operand(address));
     }
-    
-    
+
+
+    Condition testUndefined(Condition cond, const Operand &operand) {
+        JS_ASSERT(cond == Equal || cond == NotEqual);
+        cmpl(ToType(operand), ImmTag(JSVAL_TAG_UNDEFINED));
+        return cond;
+    }
+    Condition testUndefined(Condition cond, const Address &addr) {
+        return testUndefined(cond, Operand(addr));
+    }
+
+
     Condition testUndefined(Condition cond, const ValueOperand &value) {
         return testUndefined(cond, value.typeReg());
     }
@@ -432,14 +398,94 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
     Condition testPrimitive(Condition cond, const ValueOperand &value) {
         return testPrimitive(cond, value.typeReg());
     }
-//cmpPtr指令，仅完成了compare的指令的一部分，将需要比较的数移动至指定的两个寄存器中
+
+
+    Condition testUndefined(Condition cond, const BaseIndex &address) {
+        JS_ASSERT(cond == Equal || cond == NotEqual);
+        cmpl(tagOf(address), ImmTag(JSVAL_TAG_UNDEFINED));
+        return cond;
+    }
+    Condition testNull(Condition cond, const BaseIndex &address) {
+        JS_ASSERT(cond == Equal || cond == NotEqual);
+        cmpl(tagOf(address), ImmTag(JSVAL_TAG_NULL));
+        return cond;
+    }
+    Condition testBoolean(Condition cond, const BaseIndex &address) {
+        JS_ASSERT(cond == Equal || cond == NotEqual);
+        cmpl(tagOf(address), ImmTag(JSVAL_TAG_BOOLEAN));
+        return cond;
+    }
+    Condition testString(Condition cond, const BaseIndex &address) {
+        JS_ASSERT(cond == Equal || cond == NotEqual);
+        cmpl(tagOf(address), ImmTag(JSVAL_TAG_STRING));
+        return cond;
+    }
+    Condition testInt32(Condition cond, const BaseIndex &address) {
+        JS_ASSERT(cond == Equal || cond == NotEqual);
+        cmpl(tagOf(address), ImmTag(JSVAL_TAG_INT32));
+        return cond;
+    }
+    Condition testObject(Condition cond, const BaseIndex &address) {
+        JS_ASSERT(cond == Equal || cond == NotEqual);
+        cmpl(tagOf(address), ImmTag(JSVAL_TAG_OBJECT));
+        return cond;
+    }
+    Condition testDouble(Condition cond, const BaseIndex &address) {
+        JS_ASSERT(cond == Equal || cond == NotEqual);
+        Condition actual = (cond == Equal) ? Below : AboveOrEqual;
+        cmpl(tagOf(address), ImmTag(JSVAL_TAG_CLEAR));
+        return actual;
+    }
+    Condition testMagic(Condition cond, const BaseIndex &address) {
+        JS_ASSERT(cond == Equal || cond == NotEqual);
+        cmpl(tagOf(address), ImmTag(JSVAL_TAG_MAGIC));
+        return cond;
+    }
+    Condition testGCThing(Condition cond, const BaseIndex &address) {
+        JS_ASSERT(cond == Equal || cond == NotEqual);
+        cmpl(tagOf(address), ImmTag(JSVAL_LOWER_INCL_TAG_OF_GCTHING_SET));
+        return cond == Equal ? AboveOrEqual : Below;
+    }
+
+
+
+    void branchTestValue(Condition cond, const ValueOperand &value, const Value &v, Label *label);
+    void branchTestValue(Condition cond, const Address &valaddr, const ValueOperand &value,
+                         Label *label)
+    {
+        JS_ASSERT(cond == Equal || cond == NotEqual);
+        // Check payload before tag, since payload is more likely to differ.
+        if (cond == NotEqual) {
+            branchPtr(NotEqual, payloadOf(valaddr), value.payloadReg(), label);
+            branchPtr(NotEqual, tagOf(valaddr), value.typeReg(), label);
+
+        } else {
+            Label fallthrough;
+            branchPtr(NotEqual, payloadOf(valaddr), value.payloadReg(), &fallthrough);
+            branchPtr(Equal, tagOf(valaddr), value.typeReg(), label);
+            bind(&fallthrough);
+        }
+    }
+
+    void cmpPtr(Register lhs, const ImmWord rhs) {
+        cmpl(lhs, Imm32(rhs.value));
+    }
+    void cmpPtr(Register lhs, const ImmPtr imm) {
+        cmpPtr(lhs, ImmWord(uintptr_t(imm.value)));
+    }
     void cmpPtr(Register lhs, const ImmGCPtr rhs) {
         cmpl(lhs, rhs);
     }
     void cmpPtr(const Operand &lhs, const ImmWord rhs) {
         cmpl(lhs, rhs);
     }
+    void cmpPtr(const Operand &lhs, const ImmPtr imm) {
+        cmpPtr(lhs, ImmWord(uintptr_t(imm.value)));
+    }
     void cmpPtr(const Operand &lhs, const ImmGCPtr rhs) {
+        cmpl(lhs, rhs);
+    }
+    void cmpPtr(const Operand &lhs, const Imm32 rhs) {
         cmpl(lhs, rhs);
     }
     void cmpPtr(const Address &lhs, Register rhs) {
@@ -448,21 +494,18 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
     void cmpPtr(const Address &lhs, const ImmWord rhs) {
         cmpl(Operand(lhs), rhs);
     }
+    void cmpPtr(const Address &lhs, const ImmPtr rhs) {
+        cmpPtr(lhs, ImmWord(uintptr_t(rhs.value)));
+    }
     void cmpPtr(Register lhs, Register rhs) {
         cmpl(lhs, rhs);
-    }
-           //NOTE*:this is new in ff24   
-        void cmpPtr(const Operand &lhs, const Imm32 rhs) {
-        cmpl(lhs, rhs);
-    }
-        void cmpPtr(Register lhs, const ImmWord rhs) {
-        cmpl(lhs, Imm32(rhs.value));
     }
     void testPtr(Register lhs, Register rhs) {
         testl(lhs, rhs);
     }
 
     Condition testNegativeZero(const FloatRegister &reg, const Register &scratch);
+    Condition testNegativeZeroFloat32(const FloatRegister &reg, const Register &scratch);
 
     /////////////////////////////////////////////////////////////////
     // Common interface.
@@ -481,7 +524,7 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
     void freeStack(Register amount) {
         addl(amount, StackPointer);
     }
-//生成两个操作数的add指令
+
     void addPtr(const Register &src, const Register &dest) {
         addl(src, dest);
     }
@@ -491,40 +534,57 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
     void addPtr(ImmWord imm, const Register &dest) {
         addl(Imm32(imm.value), dest);
     }
+    void addPtr(ImmPtr imm, const Register &dest) {
+        addPtr(ImmWord(uintptr_t(imm.value)), dest);
+    }
     void addPtr(Imm32 imm, const Address &dest) {
         addl(imm, Operand(dest));
     }
-       //NOTE*:this is new in ff24 
-      void addPtr(const Address &src, const Register &dest) {
+    void addPtr(Imm32 imm, const Operand &dest) {
+        addl(imm, dest);
+    }
+    void addPtr(const Address &src, const Register &dest) {
         addl(Operand(src), dest);
     }
     void subPtr(Imm32 imm, const Register &dest) {
         subl(imm, dest);
     }
-           //NOTE*:this is new in ff24 
-      void subPtr(const Register &src, const Register &dest) {
+    void subPtr(const Register &src, const Register &dest) {
         subl(src, dest);
     }
-           //NOTE*:this is new in ff24 
     void subPtr(const Address &addr, const Register &dest) {
         subl(Operand(addr), dest);
     }
 
-//生成生成比较+跳转的指令
+    void branch32(Condition cond, const AbsoluteAddress &lhs, Imm32 rhs, Label *label) {
+        cmpl(Operand(lhs), rhs);
+        j(cond, label);
+    }
+    void branch32(Condition cond, const AbsoluteAddress &lhs, Register rhs, Label *label) {
+        cmpl(Operand(lhs), rhs);
+        j(cond, label);
+    }
+
+    // Specialization for AsmJSAbsoluteAddress.
+    void branchPtr(Condition cond, AsmJSAbsoluteAddress lhs, Register ptr, Label *label) {
+        cmpl(lhs, ptr);
+        j(cond, label);
+    }
+
     template <typename T, typename S>
     void branchPtr(Condition cond, T lhs, S ptr, Label *label) {
         cmpl(Operand(lhs), ptr);
         j(cond, label);
     }
 
-    template <typename T>
-    void branchPrivatePtr(Condition cond, T lhs, ImmWord ptr, Label *label) {
+    void branchPrivatePtr(Condition cond, const Address &lhs, ImmPtr ptr, Label *label) {
         branchPtr(cond, lhs, ptr, label);
     }
- //NOTE*:this is new in ff24 
+
     void branchPrivatePtr(Condition cond, const Address &lhs, Register ptr, Label *label) {
         branchPtr(cond, lhs, ptr, label);
     }
+
     template <typename T, typename S>
     void branchPtr(Condition cond, T lhs, S ptr, RepatchLabel *label) {
         cmpl(Operand(lhs), ptr);
@@ -535,6 +595,12 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
         jump(label);
         return CodeOffsetJump(size());
     }
+
+    CodeOffsetJump jumpWithPatch(RepatchLabel *label, Assembler::Condition cond) {
+        j(cond, label);
+        return CodeOffsetJump(size());
+    }
+
     template <typename S, typename T>
     CodeOffsetJump branchPtrWithPatch(Condition cond, S lhs, T ptr, RepatchLabel *label) {
         branchPtr(cond, lhs, ptr, label);
@@ -552,12 +618,10 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
         testl(lhs, rhs);
         j(cond, label);
     }
-     //NOTE*:this is new in ff24 
     void branchTestPtr(Condition cond, Register lhs, Imm32 imm, Label *label) {
         testl(lhs, imm);
         j(cond, label);
     }
-     //NOTE*:this is new in ff24 
     void branchTestPtr(Condition cond, const Address &lhs, Imm32 imm, Label *label) {
         testl(Operand(lhs), imm);
         j(cond, label);
@@ -570,21 +634,26 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
     void movePtr(ImmWord imm, Register dest) {
         movl(Imm32(imm.value), dest);
     }
+    void movePtr(ImmPtr imm, Register dest) {
+        movl(imm, dest);
+    }
+    void movePtr(AsmJSImmPtr imm, Register dest) {
+        mov(imm, dest);
+    }
     void movePtr(ImmGCPtr imm, Register dest) {
         movl(imm, dest);
     }
     void loadPtr(const Address &address, Register dest) {
         movl(Operand(address), dest);
     }
-    void loadPtr(const BaseIndex &src, Register dest) {//TBD BaseIndex special treat
+    void loadPtr(const Operand &src, Register dest) {
+        movl(src, dest);
+    }
+    void loadPtr(const BaseIndex &src, Register dest) {
         movl(Operand(src), dest);
     }
     void loadPtr(const AbsoluteAddress &address, Register dest) {
         movl(Operand(address), dest);
-    }
-    ////NOTE*:this is new in ff24 
-        void loadPtr(const Operand &src, Register dest) {
-        movl(src, dest);
     }
     void loadPrivate(const Address &src, Register dest) {
         movl(payloadOf(src), dest);
@@ -592,25 +661,28 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
     void storePtr(ImmWord imm, const Address &address) {
         movl(Imm32(imm.value), Operand(address));
     }
+    void storePtr(ImmPtr imm, const Address &address) {
+        storePtr(ImmWord(uintptr_t(imm.value)), address);
+    }
     void storePtr(ImmGCPtr imm, const Address &address) {
         movl(imm, Operand(address));
     }
     void storePtr(Register src, const Address &address) {
         movl(src, Operand(address));
     }
-    void storePtr(Register src, const AbsoluteAddress &address) {
-        movl(src, Operand(address));
-    }
-//NOTE*:this is new in ff24
     void storePtr(Register src, const Operand &dest) {
         movl(src, dest);
     }
+    void storePtr(Register src, const AbsoluteAddress &address) {
+        movl(src, Operand(address));
+    }
+
     void setStackArg(const Register &reg, uint32_t arg) {
-        movl(reg, Operand(sp, arg * STACK_SLOT_SIZE));
+        movl(reg, Operand(esp, arg * STACK_SLOT_SIZE));
     }
 
     // Type testing instructions can take a tag in a register or a
-    // ValueOperand.类型检测+跳转
+    // ValueOperand.
     template <typename T>
     void branchTestUndefined(Condition cond, const T &t, Label *label) {
         cond = testUndefined(cond, t);
@@ -666,18 +738,7 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
         cond = testMagic(cond, t);
         j(cond, label);
     }
-    void branchTestValue(Condition cond, const ValueOperand &value, const Value &v, Label *label);
-
-//NOTE*:this is new in ff24
- void branchTestValue(Condition cond, const Address &valaddr, const ValueOperand &value,
-                         Label *label)
-    {
-        JS_ASSERT(cond == Equal || cond == NotEqual);
-        branchPtr(cond, tagOf(valaddr), value.typeReg(), label);
-        branchPtr(cond, payloadOf(valaddr), value.payloadReg(), label);
-    }
-//NOTE*:this is new in ff24
- void branchTestMagicValue(Condition cond, const ValueOperand &val, JSWhyMagic why,
+    void branchTestMagicValue(Condition cond, const ValueOperand &val, JSWhyMagic why,
                               Label *label)
     {
         JS_ASSERT(cond == Equal || cond == NotEqual);
@@ -696,9 +757,8 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
         }
     }
 
-//不同数据类型的Box操作
     // Note: this function clobbers the source register.
-    void boxDouble(const FloatRegister &src, const ValueOperand &dest) {//开箱Double类型，将其double类型的高32和低32位分别放入ValueOperand类型的tape域和payload域
+    void boxDouble(const FloatRegister &src, const ValueOperand &dest) {
 //        movd(src, dest.payloadReg());
 //        psrldq(Imm32(4), src);
 //        movd(src, dest.typeReg());
@@ -715,57 +775,60 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
     void unboxInt32(const Address &src, const Register &dest) {
         movl(payloadOf(src), dest);
     }
+    void unboxDouble(const Address &src, const FloatRegister &dest) {
+        loadDouble(Operand(src), dest);
+    }
     void unboxBoolean(const ValueOperand &src, const Register &dest) {
         movl(src.payloadReg(), dest);
     }
     void unboxBoolean(const Address &src, const Register &dest) {
         movl(payloadOf(src), dest);
     }
+    void unboxObject(const ValueOperand &src, const Register &dest) {
+        if (src.payloadReg() != dest)
+            movl(src.payloadReg(), dest);
+    }
     void unboxDouble(const ValueOperand &src, const FloatRegister &dest) {
         JS_ASSERT(dest != ScratchFloatReg);
 #if 0
-//        if (0/*Assembler::HasSSE41()*/) {
-//            movd(src.payloadReg(), dest);
-//            pinsrd(src.typeReg(), dest);
-//        } else {
-//            movd(src.payloadReg(), dest);
-//            movd(src.typeReg(), ScratchFloatReg);
-//            unpcklps(ScratchFloatReg, dest);
-//        }
+        if (Assembler::HasSSE41()) {
+            movd(src.payloadReg(), dest);
+            pinsrd(src.typeReg(), dest);
+        } else {
+            movd(src.payloadReg(), dest);
+            movd(src.typeReg(), ScratchFloatReg);
+            unpcklps(ScratchFloatReg, dest);
+        }
 #endif
         fastLoadDouble(src.payloadReg(), src.typeReg(), dest);
     }
-    //该函数还未实现，没有使用到的地方
     void unboxDouble(const Operand &payload, const Operand &type,
                      const Register &scratch, const FloatRegister &dest) {
         JS_ASSERT(dest != ScratchFloatReg);
-        JS_ASSERT(0);
-//        if (0/*Assembler::HasSSE41()*/) {
-//            movl(payload, scratch);
-//            movd(scratch, dest);
-//            movl(type, scratch);
-//            pinsrd(scratch, dest);//合并数到寄存器dest中，
-//        } else {
-//            movl(payload, scratch);
-//            movd(scratch, dest);
-//            movl(type, scratch);
-//            movd(scratch, ScratchFloatReg);
-//            unpcklps(ScratchFloatReg, dest);//合并浮点数
-//        }
-//可用mips中的mtc1指令和mthc1指令来完成
+        if (Assembler::HasSSE41()) {
+            movl(payload, scratch);
+            movd(scratch, dest);
+            movl(type, scratch);
+            pinsrd(scratch, dest);
+        } else {
+            movl(payload, scratch);
+            movd(scratch, dest);
+            movl(type, scratch);
+            movd(scratch, ScratchFloatReg);
+            unpcklps(ScratchFloatReg, dest);
+        }
     }
-    
-    //NOTE*:this is new in ff24
-        void unboxDouble(const Address &src, const FloatRegister &dest) {
-       movsd(Operand(src), dest);
+    void unboxString(const ValueOperand &src, const Register &dest) {
+        movl(src.payloadReg(), dest);
+    }
+    void unboxString(const Address &src, const Register &dest) {
+        movl(payloadOf(src), dest);
     }
     void unboxValue(const ValueOperand &src, AnyRegister dest) {
         if (dest.isFloat()) {
             Label notInt32, end;
             branchTestInt32(Assembler::NotEqual, src, &notInt32);
-        //NOTE*:update in ff24;      
-        //    cvtsi2sd(Operand(src.payloadReg()), dest.fpu()); 
-          cvtsi2sd(src.payloadReg(), dest.fpu());
+            convertInt32ToDouble(src.payloadReg(), dest.fpu());
             jump(&end);
             bind(&notInt32);
             unboxDouble(src, dest.fpu());
@@ -779,14 +842,14 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
         if (src.payloadReg() != dest)
             movl(src.payloadReg(), dest);
     }
-    //NOTE*:this is new in ff24
+
     void notBoolean(const ValueOperand &val) {
         xorl(Imm32(1), val.payloadReg());
     }
+
     // Extended unboxing API. If the payload is already in a register, returns
     // that register. Otherwise, provides a move to the given scratch register,
     // and returns that.
-  //提取payload域的值
     Register extractObject(const Address &address, Register scratch) {
         movl(payloadOf(address), scratch);
         return scratch;
@@ -794,16 +857,12 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
     Register extractObject(const ValueOperand &value, Register scratch) {
         return value.payloadReg();
     }
-      //NOTE*:this is new in ff24
     Register extractInt32(const ValueOperand &value, Register scratch) {
         return value.payloadReg();
     }
-      //NOTE*:this is new in ff24
     Register extractBoolean(const ValueOperand &value, Register scratch) {
         return value.payloadReg();
     }
-    
-    //提取tag域的值
     Register extractTag(const Address &address, Register scratch) {
         movl(tagOf(address), scratch);
         return scratch;
@@ -811,17 +870,42 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
     Register extractTag(const ValueOperand &value, Register scratch) {
         return value.typeReg();
     }
-//不同类型间的转换
+
     void boolValueToDouble(const ValueOperand &operand, const FloatRegister &dest) {
-        cvtsi2sd(operand.payloadReg(), dest);
+        convertInt32ToDouble(operand.payloadReg(), dest);
+    }
+    void boolValueToFloat32(const ValueOperand &operand, const FloatRegister &dest) {
+        convertInt32ToFloat32(operand.payloadReg(), dest);
     }
     void int32ValueToDouble(const ValueOperand &operand, const FloatRegister &dest) {
-        cvtsi2sd(operand.payloadReg(), dest);
+        convertInt32ToDouble(operand.payloadReg(), dest);
+    }
+    void int32ValueToFloat32(const ValueOperand &operand, const FloatRegister &dest) {
+        convertInt32ToFloat32(operand.payloadReg(), dest);
     }
 
     void loadConstantDouble(double d, const FloatRegister &dest);
-    void loadStaticDouble(const double *dp, const FloatRegister &dest) {
-        movsd(dp, dest);
+    void addConstantDouble(double d, const FloatRegister &dest);
+    void loadConstantFloat32(float f, const FloatRegister &dest);
+    void addConstantFloat32(float f, const FloatRegister &dest);
+
+    void branchTruncateDouble(const FloatRegister &src, const Register &dest, Label *fail) {
+        cvttsd2si(src, dest);
+
+        // cvttsd2si returns 0x80000000 on failure. Test for it by
+        // subtracting 1 and testing overflow (this permits the use of a
+        // smaller immediate field).
+        cmpl(dest, Imm32(1));
+        j(Assembler::Overflow, fail);
+    }
+    void branchTruncateFloat32(const FloatRegister &src, const Register &dest, Label *fail) {
+        cvttss2si(src, dest);
+
+        // cvttss2si returns 0x80000000 on failure. Test for it by
+        // subtracting 1 and testing overflow (this permits the use of a
+        // smaller immediate field).
+        cmpl(dest, Imm32(1));
+        j(Assembler::Overflow, fail);
     }
 
     Condition testInt32Truthy(bool truthy, const ValueOperand &operand) {
@@ -834,7 +918,7 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
     }
     Condition testStringTruthy(bool truthy, const ValueOperand &value) {
         Register string = value.payloadReg();
-        Operand lengthAndFlags(string, JSString::offsetOfLengthAndFlags());//在vm/String.h中定义lengthAndFlags为size_t
+        Operand lengthAndFlags(string, JSString::offsetOfLengthAndFlags());
 
         size_t mask = (0xFFFFFFFF << JSString::LENGTH_SHIFT);
         testl(lengthAndFlags, Imm32(mask));
@@ -845,10 +929,10 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
     void loadInt32OrDouble(const Operand &operand, const FloatRegister &dest) {
         Label notInt32, end;
         branchTestInt32(Assembler::NotEqual, operand, &notInt32);
-        cvtsi2sd(ToPayload(operand), dest);
+        convertInt32ToDouble(ToPayload(operand), dest);
         jump(&end);
         bind(&notInt32);
-        movsd(operand, dest);
+        loadDouble(operand, dest);
         bind(&end);
     }
 
@@ -866,28 +950,21 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
     void lshiftPtr(Imm32 imm, Register dest) {
         shll(imm, dest);
     }
-    //NOTE*:this is new in ff24
-        void xorPtr(Imm32 imm, Register dest) {
+    void xorPtr(Imm32 imm, Register dest) {
         xorl(imm, dest);
     }
-    //NOTE*:this is new in ff24
     void xorPtr(Register src, Register dest) {
         xorl(src, dest);
     }
-    
     void orPtr(Imm32 imm, Register dest) {
         orl(imm, dest);
     }
-
-    //NOTE*:this is new in ff24
     void orPtr(Register src, Register dest) {
         orl(src, dest);
     }
-    //NOTE*:this is new in ff24
-        void andPtr(Imm32 imm, Register dest) {
+    void andPtr(Imm32 imm, Register dest) {
         andl(imm, dest);
     }
-    //NOTE*:this is new in ff24
     void andPtr(Register src, Register dest) {
         andl(src, dest);
     }
@@ -902,26 +979,36 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
         subl(Imm32(0x80000000), src);
 
         // Now src is [-2^31, 2^31-1] - int range, but not the same value.
-        cvtsi2sd(src, dest);
+        convertInt32ToDouble(src, dest);
 
         // dest is now a double with the int range.
         // correct the double value by adding 0x80000000.
-        static const double NegativeOne = 2147483648.0;
-        addsd(Operand(&NegativeOne), dest);
+        addConstantDouble(2147483648.0, dest);
+    }
+
+    // Note: this function clobbers the source register.
+    void convertUInt32ToFloat32(const Register &src, const FloatRegister &dest) {
+        // src is [0, 2^32-1]
+        subl(Imm32(0x80000000), src);
+
+        // Do it the GCC way
+        convertInt32ToFloat32(src, dest);
+
+        // dest is now a double with the int range.
+        // correct the double value by adding 0x80000000.
+        addConstantFloat32(2147483648.f, dest);
     }
 
     void inc64(AbsoluteAddress dest) {
         addl(Imm32(1), Operand(dest));
         Label noOverflow;
-      //add by QuQiuwen
-      //J指令会对两个比较寄存器中的数作比较，需要往比较寄存器中传递数据，条件为NonZero时，代码定义两个比较的数不相等则跳转
-     cmpl(zero,Operand(dest));
+        cmpl(zero,Operand(dest));
         j(NonZero, &noOverflow);
         addl(Imm32(1), Operand(dest.offset(4)));
         bind(&noOverflow);
     }
 
-    //NOTE*:this is new in ff24
+
     // If source is a double, load it into dest. If source is int32,
     // convert it to double. Else, branch to failure.
     void ensureDouble(const ValueOperand &source, FloatRegister dest, Label *failure) {
@@ -939,16 +1026,16 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
     }
 
     // Setup a call to C/C++ code, given the number of general arguments it
-    // takes. Note that this only supports cdecl.调用C++代码时，需要传递参数
+    // takes. Note that this only supports cdecl.
     //
     // In order for alignment to work correctly, the MacroAssembler must have a
     // consistent view of the stack displacement. It is okay to call "push"
     // manually, however, if the stack alignment were to change, the macro
-    // assembler should be notified before starting a call.为保持堆栈分布的一致性
+    // assembler should be notified before starting a call.
     void setupAlignedABICall(uint32_t args);
 
     // Sets up an ABI call for when the alignment is not known. This may need a
-    // scratch register. 
+    // scratch register.
     void setupUnalignedABICall(uint32_t args, const Register &scratch);
 
     // Arguments must be assigned to a C/C++ call in order. They are moved
@@ -962,64 +1049,47 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
     void passABIArg(const FloatRegister &reg);
 
   private:
-  	  //NOTE*:this is new in ff24
     void callWithABIPre(uint32_t *stackAdjust);
-      //NOTE*:this is new in ff24
     void callWithABIPost(uint32_t stackAdjust, Result result);
-    
-     public:
+
+  public:
     // Emits a call to a C/C++ function, resolving all argument moves.
     void callWithABI(void *fun, Result result = GENERAL);
-    
-    //NOTE*:this is new in ff24
+    void callWithABI(AsmJSImmPtr fun, Result result = GENERAL);
     void callWithABI(const Address &fun, Result result = GENERAL);
-    // Used from within an Exit frame to handle a pending exception.
 
-//this funtion is deleted in ff24;
-/*  
-    void handleException();
-    */
-    
-    //NOTE*:this is new in ff24
-        // Used from within an Exit frame to handle a pending exception.
+    // Used from within an Exit frame to handle a pending exception.
     void handleFailureWithHandler(void *handler);
+    void handleFailureWithHandlerTail();
 
     void makeFrameDescriptor(Register frameSizeReg, FrameType type) {
-        shll(Imm32(FRAMESIZE_SHIFT), frameSizeReg);//FRAMESIZE_SHIFT为4，对应MIPS::sll指令，将frameSizeReg的值左移4位
-        orl(Imm32(type), frameSizeReg);//将对应的位置1
+        shll(Imm32(FRAMESIZE_SHIFT), frameSizeReg);
+        orl(Imm32(type), frameSizeReg);
     }
 
     // Save an exit frame (which must be aligned to the stack pointer) to
-    // ThreadData::ionTop.
+    // ThreadData::ionTop of the main thread.
     void linkExitFrame() {
-        JSCompartment *compartment = GetIonContext()->compartment;
-          //NOTE*:this is new in ff24
-     //   movl(StackPointer, Operand(&compartment->rt->ionTop));
-       movl(StackPointer, Operand(&compartment->rt->mainThread.ionTop));
+        movl(StackPointer, Operand(AbsoluteAddress(GetIonContext()->runtime->addressOfIonTop())));
     }
 
-     //NOTE*:this is new in ff24
+    void callWithExitFrame(IonCode *target, Register dynStack) {
+        addPtr(Imm32(framePushed()), dynStack);
+        makeFrameDescriptor(dynStack, IonFrame_OptimizedJS);
+        Push(dynStack);
+        call(target);
+    }
+
     // Save an exit frame to the thread data of the current thread, given a
     // register that holds a PerThreadData *.
     void linkParallelExitFrame(const Register &pt) {
         movl(StackPointer, Operand(pt, offsetof(PerThreadData, ionTop)));
     }
-    
-    void callWithExitFrame(IonCode *target, Register dynStack);
 
     void enterOsr(Register calleeToken, Register code);
-       //NOTE*:this is new in ff24
-        // See CodeGeneratorX86 calls to noteAsmJSGlobalAccess.
-    void patchAsmJSGlobalAccess(unsigned offset, uint8_t *code, unsigned codeBytes,
-                                unsigned globalDataOffset)
-    {
-        uint8_t *nextInsn = code + offset;
-        JS_ASSERT(nextInsn <= code + codeBytes);
-        uint8_t *target = code + codeBytes + globalDataOffset;
-        ((int32_t *)nextInsn)[-1] = uintptr_t(target);
-    }
+};
 
-  protected://x86
+  protected:
     // Bytes pushed onto the frame by the callee; includes frameDepth_. This is
     // needed to compute offsets to stack slots while temporary space has been
     // reserved for unexpected spills or C++ function calls. It is maintained
@@ -1027,7 +1097,7 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
     // use StudlyCaps (for example, Push, Pop).
     uint32_t framePushed_;
 
-  public://x86
+  public:
     MacroAssemblerMIPS()
       : inCall_(false),
         framePushed_(0),
@@ -1063,17 +1133,46 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
         j(ConditionFromDoubleCondition(cond), label);
     }
 
-    void move32(const Imm32 &imm, const Register &dest) {
-        if (imm.value == 0)
-            xorl(dest, dest);
+    void compareFloat(DoubleCondition cond, const FloatRegister &lhs, const FloatRegister &rhs) {
+        if (cond & DoubleConditionBitInvert)
+            ucomiss(rhs, lhs);
         else
-            movl(imm, dest);
+            ucomiss(lhs, rhs);
     }
-           //NOTE*:this is new in ff24
-        void move32(const Imm32 &imm, const Operand &dest) {
+    void branchFloat(DoubleCondition cond, const FloatRegister &lhs,
+                      const FloatRegister &rhs, Label *label)
+    {
+        compareFloat(cond, lhs, rhs);
+
+        if (cond == DoubleEqual) {
+            Label unordered;
+            j(Parity, &unordered);
+            j(Equal, label);
+            bind(&unordered);
+            return;
+        }
+        if (cond == DoubleNotEqualOrUnordered) {
+            j(NotEqual, label);
+            j(Parity, label);
+            return;
+        }
+
+        JS_ASSERT(!(cond & DoubleConditionBitSpecial));
+        j(ConditionFromDoubleCondition(cond), label);
+    }
+
+    void move32(const Imm32 &imm, const Register &dest) {
+        // Use the ImmWord version of mov to register, which has special
+        // optimizations. Casting to uint32_t here ensures that the value
+        // is zero-extended.
+        mov(ImmWord(uint32_t(imm.value)), dest);
+    }
+    void move32(const Imm32 &imm, const Operand &dest) {
         movl(imm, dest);
     }
-    
+    void move32(const Register &src, const Register &dest) {
+        movl(src, dest);
+    }
     void and32(const Imm32 &imm, const Register &dest) {
         andl(imm, dest);
     }
@@ -1095,8 +1194,7 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
     void test32(const Register &lhs, const Register &rhs) {
         testl(lhs, rhs);
     }
-      //NOTE*:this is new in ff24
-        void test32(const Address &addr, Imm32 imm) {
+    void test32(const Address &addr, Imm32 imm) {
         testl(Operand(addr), imm);
     }
     void cmp32(Register a, Register b) {
@@ -1108,34 +1206,32 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
     void cmp32(const Operand &lhs, const Register &rhs) {
         cmpl(lhs, rhs);
     }
+    void add32(Register src, Register dest) {
+        addl(src, dest);
+    }
     void add32(Imm32 imm, Register dest) {
         addl(imm, dest);
     }
     void add32(Imm32 imm, const Address &dest) {
         addl(imm, Operand(dest));
     }
-          //NOTE*:this is new in ff24
-        void add32(Register src, Register dest) {
-        addl(src, dest);
-    }
     void sub32(Imm32 imm, Register dest) {
         subl(imm, dest);
     }
-        //NOTE*:this is new in ff24
     void sub32(Register src, Register dest) {
         subl(src, dest);
     }
-       //NOTE*:this is new in ff24
     void xor32(Imm32 imm, Register dest) {
         xorl(imm, dest);
     }
+    void not32(Register reg) {
+        notl(reg);
+    }
 
- //NOTE*:this is new in ff24
     void branch32(Condition cond, const Operand &lhs, const Register &rhs, Label *label) {
         cmpl(lhs, rhs);
         j(cond, label);
     }
- //NOTE*:this is new in ff24
     void branch32(Condition cond, const Operand &lhs, Imm32 rhs, Label *label) {
         cmpl(lhs, rhs);
         j(cond, label);
@@ -1156,19 +1252,7 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
         cmpl(lhs, rhs);
         j(cond, label);
     }
-    
-       //NOTE*:this is new in ff24
-        void branch32(Condition cond, const AbsoluteAddress &lhs, Imm32 rhs, Label *label) {
-        cmpl(Operand(lhs), rhs);
-        j(cond, label);
-    }
-   //NOTE*:this is new in ff24
-    void branch32(Condition cond, const AbsoluteAddress &lhs, Register rhs, Label *label) {
-        cmpl(Operand(lhs), rhs);
-        j(cond, label);
-    }
-    
-   void branchTest32(Condition cond, const Register &lhs, const Register &rhs, Label *label) {
+    void branchTest32(Condition cond, const Register &lhs, const Register &rhs, Label *label) {
         testl(lhs, rhs);
         j(cond, label);
     }
@@ -1195,10 +1279,18 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
         framePushed_ += sizeof(word.value);
         return pushWithPatch(word);
     }
+    CodeOffsetLabel PushWithPatch(const ImmPtr &imm) {
+        return PushWithPatch(ImmWord(uintptr_t(imm.value)));
+    }
 
-    void Pop(const Register &reg) {
-        pop(reg);
+    template <typename T>
+    void Pop(const T &t) {
+        pop(t);
         framePushed_ -= STACK_SLOT_SIZE;
+    }
+    void Pop(const FloatRegister &t) {
+        pop(t);
+        framePushed_ -= sizeof(double);
     }
     void implicitPop(uint32_t args) {
         JS_ASSERT(args % STACK_SLOT_SIZE == 0);
@@ -1220,45 +1312,57 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
     void jump(Register reg) {
         jmp(Operand(reg));
     }
-//update in ff24
- /*   void convertInt32ToDouble(const Register &src, const FloatRegister &dest) {
-        cvtsi2sd(Operand(src), dest);
+    void jump(const Address &addr) {
+        jmp(Operand(addr));
     }
-    */
-          //NOTE*:this is new in ff24
-       void convertInt32ToDouble(const Register &src, const FloatRegister &dest) {
+
+    void convertInt32ToDouble(const Register &src, const FloatRegister &dest) {
+        // cvtsi2sd and friends write only part of their output register, which
+        // causes slowdowns on out-of-order processors. Explicitly break
+        // dependencies with xorpd (and xorps elsewhere), which are handled
+        // specially in modern CPUs, for this purpose. See sections 8.14, 9.8,
+        // 10.8, 12.9, 13.16, 14.14, and 15.8 of Agner's Microarchitecture
+        // document.
+        zeroDouble(dest);
         cvtsi2sd(src, dest);
     }
-          //NOTE*:this is new in ff24
     void convertInt32ToDouble(const Address &src, FloatRegister dest) {
-        cvtsi2sd(Operand(src), dest);
-    } 
-    
-    
-    
-   Condition testDoubleTruthy(bool truthy, const FloatRegister &reg) {
-        xorpd(ScratchFloatReg, ScratchFloatReg);//将ScratchFloatReg置零；ScratchFloatReg在MIPS中定义为f2寄存器；
-        ucomisd(ScratchFloatReg, reg);//将两个操作数移入两个特定的比较寄存器中；
-        //return truthy ? Assembler::DoubleNotEqual : Assembler::DoubleEqual;
-        return truthy ? NonZero : Zero;
+        convertInt32ToDouble(Operand(src), dest);
     }
-    void branchTruncateDouble(const FloatRegister &src, const Register &dest, Label *fail) {
-        JS_STATIC_ASSERT(INT_MIN == int(0x80000000));
-        cvttsd2si(src, dest);//将double转换为32位整型；
-        cmpl(dest, Imm32(INT_MIN));//将这个32位数与0x80000000作比较；
-        j(Assembler::Equal, fail);
+    void convertInt32ToDouble(const Operand &src, FloatRegister dest) {
+        // Clear the output register first to break dependencies; see above;
+        zeroDouble(dest);
+        cvtsi2sd(Operand(src), dest);
+    }
+    void convertInt32ToFloat32(const Register &src, const FloatRegister &dest) {
+        // Clear the output register first to break dependencies; see above;
+        zeroFloat32(dest);
+        cvtsi2ss(src, dest);
+    }
+    void convertInt32ToFloat32(const Address &src, FloatRegister dest) {
+        convertInt32ToFloat32(Operand(src), dest);
+    }
+    void convertInt32ToFloat32(const Operand &src, FloatRegister dest) {
+        // Clear the output register first to break dependencies; see above;
+        zeroFloat32(dest);
+        cvtsi2ss(src, dest);
+    }
+    Condition testDoubleTruthy(bool truthy, const FloatRegister &reg) {
+        zeroDouble(ScratchFloatReg);
+        ucomisd(ScratchFloatReg, reg);
+        return truthy ? NonZero : Zero;
     }
     void load8ZeroExtend(const Address &src, const Register &dest) {
         movzbl(Operand(src), dest);
     }
-    void load8ZeroExtend(const BaseIndex &src, const Register &dest) {//TBD BaseIndex special treat
+    void load8ZeroExtend(const BaseIndex &src, const Register &dest) {
         movzbl(Operand(src), dest);
     }
     void load8SignExtend(const Address &src, const Register &dest) {
-        movxbl(Operand(src), dest);
+        movsbl(Operand(src), dest);
     }
-    void load8SignExtend(const BaseIndex &src, const Register &dest) {//TBD BaseIndex special treat
-        movxbl(Operand(src), dest);
+    void load8SignExtend(const BaseIndex &src, const Register &dest) {
+        movsbl(Operand(src), dest);
     }
     template <typename S, typename T>
     void store8(const S &src, const T &dest) {
@@ -1267,7 +1371,7 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
     void load16ZeroExtend(const Address &src, const Register &dest) {
         movzwl(Operand(src), dest);
     }
-    void load16ZeroExtend(const BaseIndex &src, const Register &dest) {//TBD BaseIndex special treat
+    void load16ZeroExtend(const BaseIndex &src, const Register &dest) {
         movzwl(Operand(src), dest);
     }
     template <typename S, typename T>
@@ -1275,19 +1379,18 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
         movw(src, Operand(dest));
     }
     void load16SignExtend(const Address &src, const Register &dest) {
-        movxwl(Operand(src), dest);
+        movswl(Operand(src), dest);
     }
-    void load16SignExtend(const BaseIndex &src, const Register &dest) {//TBD BaseIndex special treat
-        movxwl(Operand(src), dest);
+    void load16SignExtend(const BaseIndex &src, const Register &dest) {
+        movswl(Operand(src), dest);
     }
     void load32(const Address &address, Register dest) {
         movl(Operand(address), dest);
     }
-    void load32(const BaseIndex &src, Register dest) {//TBD BaseIndex special treat
+    void load32(const BaseIndex &src, Register dest) {
         movl(Operand(src), dest);
     }
-    //NOTE*:this is new in ff24
-        void load32(const Operand &src, Register dest) {
+    void load32(const Operand &src, Register dest) {
         movl(src, dest);
     }
     template <typename S, typename T>
@@ -1295,86 +1398,132 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
         movl(src, Operand(dest));
     }
     void loadDouble(const Address &src, FloatRegister dest) {
-        movsd(Operand(src), dest);
-    }
-    void loadDouble(const BaseIndex &src, FloatRegister dest) {//TBD BaseIndex special treat
-        movsd(Operand(src), dest);
-    }
-    //NOTE*:this is new in ff24 
-    void loadDouble(const Operand &src, FloatRegister dest) {
-      movsd(src, dest);
-    }
-    void storeDouble(FloatRegister src, const Address &dest) {
-        movsd(src, Operand(dest));
-    }
-    void storeDouble(FloatRegister src, const BaseIndex &dest) {//TBD BaseIndex special treat
-        movsd(src, Operand(dest));
-    }
-    //NOTE*:this is new in ff24 
-        void storeDouble(FloatRegister src, const Operand &dest) {
         movsd(src, dest);
     }
-    void zeroDouble(FloatRegister reg) {
-        zerod(reg);
+    void loadDouble(const BaseIndex &src, FloatRegister dest) {
+        movsd(src, dest);
     }
-  //rename in ff24;
-    /*  void negDouble(FloatRegister src, FloatRegister dest) {
-        negd(src, dest);
-    }*/
-        //NOTE*:this is new in ff24 
-     void negateDouble(FloatRegister reg) {
-  /*      // From MacroAssemblerX86Shared::maybeInlineDouble
-        pcmpeqw(ScratchFloatReg, ScratchFloatReg);
-        psllq(Imm32(63), ScratchFloatReg);
-
-        // XOR the float in a float register with -0.0.
-        xorpd(ScratchFloatReg, reg); // s ^ 0x80000000000000*/
-       ASSERT(0); 
-       //  negd(reg, reg);
+    void loadDouble(const Operand &src, FloatRegister dest) {
+        switch (src.kind()) {
+          case Operand::MEM_REG_DISP:
+            loadDouble(src.toAddress(), dest);
+            break;
+          case Operand::MEM_SCALE:
+            loadDouble(src.toBaseIndex(), dest);
+            break;
+          default:
+            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
+        }
+    }
+    void storeDouble(FloatRegister src, const Address &dest) {
+        movsd(src, dest);
+    }
+    void storeDouble(FloatRegister src, const BaseIndex &dest) {
+        movsd(src, dest);
+    }
+    void storeDouble(FloatRegister src, const Operand &dest) {
+        switch (dest.kind()) {
+          case Operand::MEM_REG_DISP:
+            storeDouble(src, dest.toAddress());
+            break;
+          case Operand::MEM_SCALE:
+            storeDouble(src, dest.toBaseIndex());
+            break;
+          default:
+            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
+        }
+    }
+    void moveDouble(FloatRegister src, FloatRegister dest) {
+        // Use movapd instead of movsd to avoid dependencies.
+        movapd(src, dest);
+    }
+    void zeroDouble(FloatRegister reg) {
+        xorpd(reg, reg);
+    }
+    void zeroFloat32(FloatRegister reg) {
+        xorps(reg, reg);
+    }
+    void negateDouble(FloatRegister reg) {
+        ASSERT(0);
+    }
+    void negateFloat(FloatRegister reg) {
+        ASSERT(0);
     }
     void addDouble(FloatRegister src, FloatRegister dest) {
         addsd(src, dest);
     }
-    //NOTE*:this is new in ff24 
     void subDouble(FloatRegister src, FloatRegister dest) {
         subsd(src, dest);
     }
-        //NOTE*:this is new in ff24 
     void mulDouble(FloatRegister src, FloatRegister dest) {
         mulsd(src, dest);
     }
-        //NOTE*:this is new in ff24 
     void divDouble(FloatRegister src, FloatRegister dest) {
         divsd(src, dest);
+    }
+    void convertFloatToDouble(const FloatRegister &src, const FloatRegister &dest) {
+        cvtss2sd(src, dest);
     }
     void convertDoubleToFloat(const FloatRegister &src, const FloatRegister &dest) {
         cvtsd2ss(src, dest);
     }
-    void loadFloatAsDouble(const Register &src, FloatRegister dest) {
-        movd(src, dest);//将int32转换为double；
-        cvtss2sd(dest, dest);//将单精度数转换为双精度数；
+    void moveFloatAsDouble(const Register &src, FloatRegister dest) {
+        movd(src, dest);
+        cvtss2sd(dest, dest);
     }
     void loadFloatAsDouble(const Address &src, FloatRegister dest) {
-        movss(Operand(src), dest);
-        cvtss2sd(dest, dest);
-    }
-    void loadFloatAsDouble(const BaseIndex &src, FloatRegister dest) {//TBD BaseIndex special treat
-        movss(Operand(src), dest);
-        cvtss2sd(dest, dest);
-    }
-       //NOTE*:this is new in ff24 
-     void loadFloatAsDouble(const Operand &src, FloatRegister dest) {
         movss(src, dest);
         cvtss2sd(dest, dest);
     }
+    void loadFloatAsDouble(const BaseIndex &src, FloatRegister dest) {
+        movss(src, dest);
+        cvtss2sd(dest, dest);
+    }
+    void loadFloatAsDouble(const Operand &src, FloatRegister dest) {
+        loadFloat(src, dest);
+        cvtss2sd(dest, dest);
+    }
+    void loadFloat(const Address &src, FloatRegister dest) {
+        movss(src, dest);
+    }
+    void loadFloat(const BaseIndex &src, FloatRegister dest) {
+        movss(src, dest);
+    }
+    void loadFloat(const Operand &src, FloatRegister dest) {
+        switch (src.kind()) {
+          case Operand::MEM_REG_DISP:
+            loadFloat(src.toAddress(), dest);
+            break;
+          case Operand::MEM_SCALE:
+            loadFloat(src.toBaseIndex(), dest);
+            break;
+          default:
+            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
+        }
+    }
     void storeFloat(FloatRegister src, const Address &dest) {
-        movss(src, Operand(dest));
+        movss(src, dest);
     }
-    void storeFloat(FloatRegister src, const BaseIndex &dest) {//TBD BaseIndex special treat
-        movss(src, Operand(dest));
+    void storeFloat(FloatRegister src, const BaseIndex &dest) {
+        movss(src, dest);
     }
-     //NOTE*:this is new in ff24 ; it's a  copy of x86;
-     //此函数中关于比较的指令，可能需要重写；
+    void storeFloat(FloatRegister src, const Operand &dest) {
+        switch (dest.kind()) {
+          case Operand::MEM_REG_DISP:
+            storeFloat(src, dest.toAddress());
+            break;
+          case Operand::MEM_SCALE:
+            storeFloat(src, dest.toBaseIndex());
+            break;
+          default:
+            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
+        }
+    }
+    void moveFloat(FloatRegister src, FloatRegister dest) {
+        // Use movaps instead of movss to avoid dependencies.
+        movaps(src, dest);
+    }
+
     // Checks whether a double is representable as a 32-bit integer. If so, the
     // integer is written to the output register. Otherwise, a bailout is taken to
     // the given snapshot. This function overwrites the scratch float register.
@@ -1384,7 +1533,7 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
         cvttsd2si(src, dest);
         cvtsi2sd(dest, ScratchFloatReg);
         ucomisd(src, ScratchFloatReg);
-        j(Assembler::Parity, fail);//目前mips还未定义关于PF的检测方案
+        j(Assembler::Parity, fail);
         j(Assembler::NotEqual, fail);
 
         // Check for -0
@@ -1393,48 +1542,66 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
             testl(dest, dest);
             j(Assembler::NonZero, &notZero);
 
-         //   if (Assembler::HasSSE41()) {
-      //          ptest(src, src);
-     //           j(Assembler::NonZero, fail);
-      //      } else {
+            if (Assembler::HasSSE41()) {
+                ptest(src, src);
+                j(Assembler::NonZero, fail);
+            } else {
                 // bit 0 = sign of low double
                 // bit 1 = sign of high double
                 movmskpd(src, dest);
                 andl(Imm32(1), dest);
-                //add by QuQiuwen
                 cmpl(zero,dest);
                 j(Assembler::NonZero, fail);
-   //         }
+            }
 
             bind(&notZero);
         }
     }
 
+    // Checks whether a float32 is representable as a 32-bit integer. If so, the
+    // integer is written to the output register. Otherwise, a bailout is taken to
+    // the given snapshot. This function overwrites the scratch float register.
+    void convertFloat32ToInt32(FloatRegister src, Register dest, Label *fail,
+                               bool negativeZeroCheck = true)
+    {
+        cvttss2si(src, dest);
+        convertInt32ToFloat32(dest, ScratchFloatReg);
+        ucomiss(src, ScratchFloatReg);
+        j(Assembler::Parity, fail);
+        j(Assembler::NotEqual, fail);
 
-//条件检测，注意！
-    void clampIntToUint8(Register src, Register dest) {
-        Label inRange, done;
-        branchTest32(Assembler::Zero, src, Imm32(0xffffff00), &inRange);//高24位如果为零，则无需转换；
+        // Check for -0
+        if (negativeZeroCheck) {
+            Label notZero;
+            branchTest32(Assembler::NonZero, dest, dest, &notZero);
+
+            if (Assembler::HasSSE41()) {
+                ptest(src, src);
+                j(Assembler::NonZero, fail);
+            } else {
+                // bit 0 = sign of low float
+                // bits 1 to 3 = signs of higher floats
+                movmskps(src, dest);
+                andl(Imm32(1), dest);
+                j(Assembler::NonZero, fail);
+            }
+
+            bind(&notZero);
+        }
+    }
+
+    void clampIntToUint8(Register reg) {
+        Label inRange;
+        branchTest32(Assembler::Zero, reg, Imm32(0xffffff00), &inRange);
         {
-            Label negative;
-            branchTest32(Assembler::Signed, src, src, &negative);
-            {
-                movl(Imm32(255), dest);//dest置为0111 1111
-                jump(&done);
-            }
-            bind(&negative);
-            {
-                xorl(dest, dest);//dest置零；
-                jump(&done);
-            }
+            sarl(Imm32(31), reg);
+            notl(reg);
+            andl(Imm32(255), reg);
         }
         bind(&inRange);
-        if (src != dest)
-            movl(src, dest);
-        bind(&done);
     }
-//this function is updete in ff24; it keeps the same as old one;
-    bool maybeInlineDouble(uint64_t u, const FloatRegister &dest) {
+
+    bool maybeInlineDouble(double d, const FloatRegister &dest) {
         // This implements parts of "13.4 Generating constants" of 
         // "2. Optimizing subroutines in assembly language" by Agner Fog.
         switch (u) {
@@ -1474,24 +1641,66 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
         }
         return true;
     }
-    
-//NOTE*:this is new in ff24 , it's a  copy of x86;
-//此函数需要重定义；
+
+    bool maybeInlineFloat(float f, const FloatRegister &dest) {
+         // This implements parts of "13.4 Generating constants" of 
+        // "2. Optimizing subroutines in assembly language" by Agner Fog.
+        switch (u) {
+          case 0x0000000000000000ULL: // 0.0
+            xorps(dest, dest);//将dest置零；
+            break;
+          case 0x8000000000000000ULL: // -0.0
+            pcmpeqw(dest, dest);//MIP中未实现；在x86中，pcmpeqw是将两个XMM寄存器作比较
+            psllq(Imm32(63), dest);//MIP中未实现；
+            break;
+          case 0x3fe0000000000000ULL: // 0.5
+            pcmpeqw(dest, dest);
+            psllq(Imm32(55), dest);
+            psrlq(Imm32(2), dest);
+            break;
+          case 0x3ff0000000000000ULL: // 1.0
+            pcmpeqw(dest, dest);
+            psllq(Imm32(54), dest);
+            psrlq(Imm32(2), dest);
+            break;
+          case 0x3ff8000000000000ULL: // 1.5
+            pcmpeqw(dest, dest);
+            psllq(Imm32(53), dest);
+            psrlq(Imm32(2), dest);
+            break;
+          case 0x4000000000000000ULL: // 2.0
+            pcmpeqw(dest, dest);
+            psllq(Imm32(63), dest);
+            psrlq(Imm32(1), dest);
+            break;
+          case 0xc000000000000000ULL: // -2.0
+            pcmpeqw(dest, dest);
+            psllq(Imm32(62), dest);
+            break;
+          default:
+            return false;
+        }
+        return true;
+    }
+
+    void convertBoolToInt32(Register source, Register dest) {
+        // Note that C++ bool is only 1 byte, so zero extend it to clear the
+        // higher-order bits.
+        movzbl(source, dest);
+    }
+
     void emitSet(Assembler::Condition cond, const Register &dest,
-              Assembler::NaNCond ifNaN = Assembler::NaN_HandledByCond) {
-             if (GeneralRegisterSet(Registers::SingleByteRegs).has(dest)) {
+                 Assembler::NaNCond ifNaN = Assembler::NaN_HandledByCond) {
+        if (GeneralRegisterSet(Registers::SingleByteRegs).has(dest)) {
             // If the register we're defining is a single byte register,
             // take advantage of the setCC instruction
             setCC(cond, dest);
-         //   movzxbl(dest, dest);//mips中尚未定义；
+//            movzbl(dest, dest);
 
             if (ifNaN != Assembler::NaN_HandledByCond) {
                 Label noNaN;
-          //      j(Assembler::NoParity, &noNaN);//NoParity的条件检测 MIPS未定义
-                if (ifNaN == Assembler::NaN_IsTrue)
-                    movl(Imm32(1), dest);
-                else
-                    xorl(dest, dest);
+ //               j(Assembler::NoParity, &noNaN);
+                mov(ImmWord(ifNaN == Assembler::NaN_IsTrue), dest);
                 bind(&noNaN);
             }
         } else {
@@ -1499,21 +1708,23 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
             Label ifFalse;
 
             if (ifNaN == Assembler::NaN_IsFalse)
-            	ASSERT(0);
-        //        j(Assembler::Parity, &ifFalse);//Parity的条件检测 MIPS未定义
+                ASSERT(0);
+  //              j(Assembler::Parity, &ifFalse);
+            // Note a subtlety here: FLAGS is live at this point, and the
+            // mov interface doesn't guarantee to preserve FLAGS. Use
+            // movl instead of mov, because the movl instruction
+            // preserves FLAGS.
             movl(Imm32(1), dest);
             j(cond, &end);
             if (ifNaN == Assembler::NaN_IsTrue)
-            	ASSERT(0);
-           //    j(Assembler::Parity, &end);
-              
+                ASSERT(0);
+//                j(Assembler::Parity, &end);
             bind(&ifFalse);
-            xorl(dest, dest);
+            mov(ImmWord(0), dest);
 
             bind(&end);
         }
     }
-
 
     // Emit a JMP that can be toggled to a CMP. See ToggleToJmp(), ToggleToCmp().
     CodeOffsetLabel toggledJump(Label *label) {
@@ -1527,28 +1738,10 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
         lea(Operand(address), dest);
     }
 
-//NOTE*:this is update in ff24; it's a  copy of x86;
     // Builds an exit frame on the stack, with a return address to an internal
     // non-function. Returns offset to be passed to markSafepointAt().
     bool buildFakeExitFrame(const Register &scratch, uint32_t *offset) {
-     /*   mozilla::DebugOnly<uint32_t> initialDepth = framePushed();//获取到当前栈已经使用的空间的大小；
-
-        CodeLabel *cl = new CodeLabel();
-        if (!addCodeLabel(cl))//将cl加入到codeLabels_链表中；codeLabels_链表用于存放链接后才能实施patch的label；
-            return false;
-        mov(cl->dest(), scratch);
-
-        uint32 descriptor = MakeFrameDescriptor(framePushed(), IonFrame_OptimizedJS);//将frameSize左移4位后，与IonFrame_OptimizedJS做或操作；
-        Push(Imm32(descriptor));
-        Push(scratch);
-
-        bind(cl->src());
-        *offset = currentOffset();
-
-        JS_ASSERT(framePushed() == initialDepth + IonExitFrameLayout::Size());
-        return true;*/
-        
-         mozilla::DebugOnly<uint32_t> initialDepth = framePushed();
+        mozilla::DebugOnly<uint32_t> initialDepth = framePushed();
 
         CodeLabel cl;
         mov(cl.dest(), scratch);
@@ -1561,18 +1754,14 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
         *offset = currentOffset();
 
         JS_ASSERT(framePushed() == initialDepth + IonExitFrameLayout::Size());
-        return addCodeLabel(cl); 
+        return addCodeLabel(cl);
     }
 
-    bool buildOOLFakeExitFrame(void *fakeReturnAddr) {
+    void callWithExitFrame(IonCode *target) {
         uint32_t descriptor = MakeFrameDescriptor(framePushed(), IonFrame_OptimizedJS);
         Push(Imm32(descriptor));
-        Push(ImmWord(fakeReturnAddr));
-        return true;
+        call(target);
     }
-
-    void callWithExitFrame(IonCode *target);
-
     void callIon(const Register &callee);
 
     void checkStackAlignment() {
@@ -1582,18 +1771,23 @@ Condition testUndefined(Condition cond, const BaseIndex &address) {
     CodeOffsetLabel labelForPatch() {
         return CodeOffsetLabel(size());
     }
-    //NOTE*:this is update in ff24;
-        void abiret() {
+
+    void abiret() {
         ret();
     }
-    
+
+  protected:
+    bool buildOOLFakeExitFrame(void *fakeReturnAddr) {
+        uint32_t descriptor = MakeFrameDescriptor(framePushed(), IonFrame_OptimizedJS);
+        Push(Imm32(descriptor));
+        Push(ImmPtr(fakeReturnAddr));
+        return true;
+    }
 };
 
 typedef MacroAssemblerMIPS MacroAssemblerSpecific;
 
-} // namespace ion
+} // namespace jit
 } // namespace js
 
-#endif // jsion_macro_assembler_x86_h__
-
-
+#endif /* jit_shared_MacroAssembler_mips_shared_h */

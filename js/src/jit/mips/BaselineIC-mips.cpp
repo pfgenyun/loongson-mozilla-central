@@ -217,7 +217,7 @@ ICBinaryArith_Int32::Compiler::generateStubCode(MacroAssembler &masm)
         }
         break;
       default:
-       JS_NOT_REACHED("Unhandled op for BinaryArith_Int32.  ");
+       MOZ_ASSUME_UNREACHABLE("Unhandled op for BinaryArith_Int32.  ");
        return false;
     }
 #endif
@@ -279,7 +279,7 @@ ICUnaryArith_Int32::Compiler::generateStubCode(MacroAssembler &masm)
         masm.negl(R0.payloadReg());
         break;
       default:
-        JS_NOT_REACHED("Unexpected op");
+        MOZ_ASSUME_UNREACHABLE("Unexpected op");
         return false;
     }
 

@@ -280,7 +280,6 @@ JitRuntime::generateEnterJIT(JSContext *cx, EnterJitType type)
 #ifdef JS_ION_PERF
     writePerfSpewerIonCodeProfile(code, "EnterJIT");
 #endif
-
     return code;
 }
 

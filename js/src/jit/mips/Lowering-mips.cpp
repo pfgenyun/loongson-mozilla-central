@@ -4,45 +4,36 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include "jit/shared/Lowering-shared.h"
+#include "mozilla/MathAlgorithms.h"
 #include "jit/MIR.h"
-#include "jit/Lowering.h"
-#include "Assembler-mips.h"
+#include "jit/mips/Assembler-mips.h"
 #include "jit/shared/Lowering-shared-inl.h"
 
 using namespace js;
 using namespace js::jit;
 
-//from shared
+using mozilla::FloorLog2;
+
 LTableSwitch *
-LIRGeneratorMIPS::newLTableSwitch(const LAllocation &in, const LDefinition &inputCopy,
+LIRGeneratorMIPSShared::newLTableSwitch(const LAllocation &in, const LDefinition &inputCopy,
                                        MTableSwitch *tableswitch)
 {
-    return new LTableSwitch(in, inputCopy, temp(), tableswitch);
+    return new(alloc()) LTableSwitch(in, inputCopy, temp(), tableswitch);
 }
 
 LTableSwitchV *
-LIRGeneratorMIPS::newLTableSwitchV(MTableSwitch *tableswitch)
+LIRGeneratorMIPSShared::newLTableSwitchV(MTableSwitch *tableswitch)
 {
-    return new LTableSwitchV(temp(), tempFloat(), temp(), tableswitch);
+    return new(alloc()) LTableSwitchV(temp(), tempDouble(), temp(), tableswitch);
 }
 
 bool
-LIRGeneratorMIPS::visitInterruptCheck(MInterruptCheck *ins)
-{
-    LInterruptCheck *lir = new LInterruptCheck();
-    if (!add(lir, ins))
-        return false;
-    if (!assignSafepoint(lir, ins))
-        return false;
-    return true;
-}
-
-bool
-LIRGeneratorMIPS::visitGuardShape(MGuardShape *ins)
+LIRGeneratorMIPSShared::visitGuardShape(MGuardShape *ins)
 {
     JS_ASSERT(ins->obj()->type() == MIRType_Object);
 
-    LGuardShape *guard = new LGuardShape(useRegister(ins->obj()));
+    LGuardShape *guard = new(alloc()) LGuardShape(useRegister(ins->obj()));
     if (!assignSnapshot(guard, ins->bailoutKind()))
         return false;
     if (!add(guard, ins))
@@ -51,11 +42,11 @@ LIRGeneratorMIPS::visitGuardShape(MGuardShape *ins)
 }
 
 bool
-LIRGeneratorMIPS::visitGuardObjectType(MGuardObjectType *ins)
+LIRGeneratorMIPSShared::visitGuardObjectType(MGuardObjectType *ins)
 {
     JS_ASSERT(ins->obj()->type() == MIRType_Object);
 
-    LGuardObjectType *guard = new LGuardObjectType(useRegister(ins->obj()));
+    LGuardObjectType *guard = new(alloc()) LGuardObjectType(useRegister(ins->obj()));
     if (!assignSnapshot(guard))
         return false;
     if (!add(guard, ins))
@@ -64,16 +55,16 @@ LIRGeneratorMIPS::visitGuardObjectType(MGuardObjectType *ins)
 }
 
 bool
-LIRGeneratorMIPS::visitPowHalf(MPowHalf *ins)
+LIRGeneratorMIPSShared::visitPowHalf(MPowHalf *ins)
 {
     MDefinition *input = ins->input();
     JS_ASSERT(input->type() == MIRType_Double);
-    LPowHalfD *lir = new LPowHalfD(useRegisterAtStart(input), temp());
+    LPowHalfD *lir = new(alloc()) LPowHalfD(useRegisterAtStart(input));
     return defineReuseInput(lir, ins, 0);
 }
 
 bool
-LIRGeneratorMIPS::lowerForShift(LInstructionHelper<1, 2, 0> *ins, MDefinition *mir,
+LIRGeneratorMIPSShared::lowerForShift(LInstructionHelper<1, 2, 0> *ins, MDefinition *mir,
                                      MDefinition *lhs, MDefinition *rhs)
 {
     ins->setOperand(0, useRegisterAtStart(lhs));
@@ -83,13 +74,13 @@ LIRGeneratorMIPS::lowerForShift(LInstructionHelper<1, 2, 0> *ins, MDefinition *m
     if (rhs->isConstant())
         ins->setOperand(1, useOrConstant(rhs));
     else
-        ins->setOperand(1, useFixed(rhs,t8/* ecx*/));
+        ins->setOperand(1, useFixed(rhs, ecx));
 
     return defineReuseInput(ins, mir, 0);
 }
 
 bool
-LIRGeneratorMIPS::lowerForALU(LInstructionHelper<1, 1, 0> *ins, MDefinition *mir,
+LIRGeneratorMIPSShared::lowerForALU(LInstructionHelper<1, 1, 0> *ins, MDefinition *mir,
                                    MDefinition *input)
 {
     ins->setOperand(0, useRegisterAtStart(input));
@@ -97,7 +88,7 @@ LIRGeneratorMIPS::lowerForALU(LInstructionHelper<1, 1, 0> *ins, MDefinition *mir
 }
 
 bool
-LIRGeneratorMIPS::lowerForALU(LInstructionHelper<1, 2, 0> *ins, MDefinition *mir,
+LIRGeneratorMIPSShared::lowerForALU(LInstructionHelper<1, 2, 0> *ins, MDefinition *mir,
                                    MDefinition *lhs, MDefinition *rhs)
 {
     ins->setOperand(0, useRegisterAtStart(lhs));
@@ -106,7 +97,7 @@ LIRGeneratorMIPS::lowerForALU(LInstructionHelper<1, 2, 0> *ins, MDefinition *mir
 }
 
 bool
-LIRGeneratorMIPS::lowerForFPU(LInstructionHelper<1, 2, 0> *ins, MDefinition *mir, MDefinition *lhs, MDefinition *rhs)
+LIRGeneratorMIPSShared::lowerForFPU(LInstructionHelper<1, 2, 0> *ins, MDefinition *mir, MDefinition *lhs, MDefinition *rhs)
 {
     ins->setOperand(0, useRegisterAtStart(lhs));
     ins->setOperand(1, use(rhs));
@@ -114,19 +105,31 @@ LIRGeneratorMIPS::lowerForFPU(LInstructionHelper<1, 2, 0> *ins, MDefinition *mir
 }
 
 bool
-LIRGeneratorMIPS::lowerMulI(MMul *mul, MDefinition *lhs, MDefinition *rhs)
+LIRGeneratorMIPSShared::lowerForBitAndAndBranch(LBitAndAndBranch *baab, MInstruction *mir,
+                                               MDefinition *lhs, MDefinition *rhs)
+{
+    baab->setOperand(0, useRegisterAtStart(lhs));
+    baab->setOperand(1, useRegisterOrConstantAtStart(rhs));
+    return add(baab, mir);
+}
+
+bool
+LIRGeneratorMIPSShared::lowerMulI(MMul *mul, MDefinition *lhs, MDefinition *rhs)
 {
     // Note: lhs is used twice, so that we can restore the original value for the
     // negative zero check.
-    LMulI *lir = new LMulI(useRegisterAtStart(lhs), useOrConstant(rhs), use(lhs));
-    if (mul->fallible() && !assignSnapshot(lir))
+    LMulI *lir = new(alloc()) LMulI(useRegisterAtStart(lhs), useOrConstant(rhs), use(lhs));
+    if (mul->fallible() && !assignSnapshot(lir, Bailout_BaselineInfo))
         return false;
     return defineReuseInput(lir, mul, 0);
 }
 
 bool
-LIRGeneratorMIPS::lowerDivI(MDiv *div)
+LIRGeneratorMIPSShared::lowerDivI(MDiv *div)
 {
+    if (div->isUnsigned())
+        return lowerUDiv(div);
+
     // Division instructions are slow. Division by constant denominators can be
     // rewritten to use other instructions.
     if (div->rhs()->isConstant()) {
@@ -137,72 +140,144 @@ LIRGeneratorMIPS::lowerDivI(MDiv *div)
         // possible; division by negative powers of two can be optimized in a
         // similar manner as positive powers of two, and division by other
         // constants can be optimized by a reciprocal multiplication technique.
-        int32_t shift;
-        JS_FLOOR_LOG2(shift, rhs);
+        int32_t shift = FloorLog2(rhs);
         if (rhs > 0 && 1 << shift == rhs) {
-            LDivPowTwoI *lir = new LDivPowTwoI(useRegisterAtStart(div->lhs()), useRegister(div->lhs()), shift);
-            if (div->fallible() && !assignSnapshot(lir))
+            LAllocation lhs = useRegisterAtStart(div->lhs());
+            LDivPowTwoI *lir;
+            if (!div->canBeNegativeDividend()) {
+                // Numerator is unsigned, so does not need adjusting.
+                lir = new(alloc()) LDivPowTwoI(lhs, lhs, shift);
+            } else {
+                // Numerator is signed, and needs adjusting, and an extra
+                // lhs copy register is needed.
+                lir = new(alloc()) LDivPowTwoI(lhs, useRegister(div->lhs()), shift);
+            }
+            if (div->fallible() && !assignSnapshot(lir, Bailout_BaselineInfo))
                 return false;
             return defineReuseInput(lir, div, 0);
         }
     }
 
-    LDivI *lir = new LDivI(useFixed(div->lhs(),t6/* eax*/), useRegister(div->rhs()), tempFixed(t7/*edx*/));
-    if (div->fallible() && !assignSnapshot(lir))
+    // Optimize x/x. This is quaint, but it also protects the LDivI code below.
+    // Since LDivI requires lhs to be in t6, and since the register allocator
+    // can't put a virtual register in two physical registers at the same time,
+    // this puts rhs in t6 too, and since rhs isn't marked usedAtStart, it
+    // would conflict with the t6 output register. (rhs could be marked
+    // usedAtStart but for the fact that LDivI clobbers t7 early and rhs could
+    // happen to be in t7).
+    if (div->lhs() == div->rhs()) {
+        if (!div->canBeDivideByZero())
+            return define(new(alloc()) LInteger(1), div);
+
+        LDivSelfI *lir = new(alloc()) LDivSelfI(useRegisterAtStart(div->lhs()));
+        if (div->fallible() && !assignSnapshot(lir, Bailout_BaselineInfo))
+            return false;
+        return define(lir, div);
+    }
+
+    LDivI *lir = new(alloc()) LDivI(useFixed(div->lhs(), t6), useRegister(div->rhs()), tempFixed(t7));
+    if (div->fallible() && !assignSnapshot(lir, Bailout_BaselineInfo))
         return false;
-    return defineFixed(lir, div, LAllocation(AnyRegister(t6/*eax*/)));
+    return defineFixed(lir, div, LAllocation(AnyRegister(t6)));
 }
 
 bool
-LIRGeneratorMIPS::lowerModI(MMod *mod)
+LIRGeneratorMIPSShared::lowerModI(MMod *mod)
 {
+    if (mod->isUnsigned())
+        return lowerUMod(mod);
+
     if (mod->rhs()->isConstant()) {
         int32_t rhs = mod->rhs()->toConstant()->value().toInt32();
-        int32_t shift;
-        JS_FLOOR_LOG2(shift, rhs);
+        int32_t shift = FloorLog2(rhs);
         if (rhs > 0 && 1 << shift == rhs) {
-            LModPowTwoI *lir = new LModPowTwoI(useRegisterAtStart(mod->lhs()), shift);
-            if (mod->fallible() && !assignSnapshot(lir))
+            LModPowTwoI *lir = new(alloc()) LModPowTwoI(useRegisterAtStart(mod->lhs()), shift);
+            if (mod->fallible() && !assignSnapshot(lir, Bailout_BaselineInfo))
                 return false;
             return defineReuseInput(lir, mod, 0);
         }
     }
-    LModI *lir = new LModI(useRegister(mod->lhs()), useRegister(mod->rhs()), tempFixed(t6/*eax*/));
-    if (mod->fallible() && !assignSnapshot(lir))
+
+    // Optimize x%x. The comments in lowerDivI apply here as well, except
+    // that we return 0 for all cases except when x is 0 and we're not
+    // truncated.
+    if (mod->rhs() == mod->lhs()) {
+        if (mod->isTruncated())
+            return define(new(alloc()) LInteger(0), mod);
+
+        LModSelfI *lir = new(alloc()) LModSelfI(useRegisterAtStart(mod->lhs()));
+        if (mod->fallible() && !assignSnapshot(lir, Bailout_BaselineInfo))
+            return false;
+        return define(lir, mod);
+    }
+
+    LModI *lir = new(alloc()) LModI(useFixedAtStart(mod->lhs(), t6),
+                                    useRegister(mod->rhs()),
+                                    tempFixed(t6));
+    if (mod->fallible() && !assignSnapshot(lir, Bailout_BaselineInfo))
         return false;
-    return defineFixed(lir, mod, LAllocation(AnyRegister(t7/*edx*/)));
+    return defineFixed(lir, mod, LAllocation(AnyRegister(t7)));
 }
 
 bool
-LIRGeneratorMIPS::visitAsmJSNeg(MAsmJSNeg *ins)
+LIRGeneratorMIPSShared::visitAsmJSNeg(MAsmJSNeg *ins)
 {
     if (ins->type() == MIRType_Int32)
-        return defineReuseInput(new LNegI(useRegisterAtStart(ins->input())), ins, 0);
+        return defineReuseInput(new(alloc()) LNegI(useRegisterAtStart(ins->input())), ins, 0);
+
+    if (ins->type() == MIRType_Float32)
+        return defineReuseInput(new(alloc()) LNegF(useRegisterAtStart(ins->input())), ins, 0);
 
     JS_ASSERT(ins->type() == MIRType_Double);
-    return defineReuseInput(new LNegD(useRegisterAtStart(ins->input())), ins, 0);
+    return defineReuseInput(new(alloc()) LNegD(useRegisterAtStart(ins->input())), ins, 0);
 }
 
 bool
-LIRGeneratorMIPS::visitAsmJSUDiv(MAsmJSUDiv *div)
+LIRGeneratorMIPSShared::lowerUDiv(MDiv *div)
 {
-    LAsmJSDivOrMod *lir = new LAsmJSDivOrMod(useFixed(div->lhs(), t6/*eax*/),
-                                             useRegister(div->rhs()),
-                                             tempFixed(t7/*edx*/));
-    return defineFixed(lir, div, LAllocation(AnyRegister(t6/*eax*/)));
+    // Optimize x/x. The comments in lowerDivI apply here as well.
+    if (div->lhs() == div->rhs()) {
+        if (!div->canBeDivideByZero())
+            return define(new(alloc()) LInteger(1), div);
+
+        LDivSelfI *lir = new(alloc()) LDivSelfI(useRegisterAtStart(div->lhs()));
+        if (div->fallible() && !assignSnapshot(lir, Bailout_BaselineInfo))
+            return false;
+        return define(lir, div);
+    }
+
+    LUDivOrMod *lir = new(alloc()) LUDivOrMod(useFixedAtStart(div->lhs(), t6),
+                                              useRegister(div->rhs()),
+                                              tempFixed(t7));
+    if (div->fallible() && !assignSnapshot(lir, Bailout_BaselineInfo))
+        return false;
+    return defineFixed(lir, div, LAllocation(AnyRegister(t6)));
 }
 
 bool
-LIRGeneratorMIPS::visitAsmJSUMod(MAsmJSUMod *mod)
+LIRGeneratorMIPSShared::lowerUMod(MMod *mod)
 {
-    LAsmJSDivOrMod *lir = new LAsmJSDivOrMod(useFixed(mod->lhs(), t6/*eax*/),
-                                             useRegister(mod->rhs()),
-                                             LDefinition::BogusTemp());
-    return defineFixed(lir, mod, LAllocation(AnyRegister(t7/*edx*/)));
+    // Optimize x%x. The comments in lowerModI apply here as well.
+    if (mod->lhs() == mod->rhs()) {
+        if (mod->isTruncated() || (mod->isUnsigned() && !mod->canBeDivideByZero()))
+            return define(new(alloc()) LInteger(0), mod);
+
+        LModSelfI *lir = new(alloc()) LModSelfI(useRegisterAtStart(mod->lhs()));
+        if (mod->fallible() && !assignSnapshot(lir, Bailout_BaselineInfo))
+            return false;
+        return define(lir, mod);
+    }
+
+    LUDivOrMod *lir = new(alloc()) LUDivOrMod(useFixedAtStart(mod->lhs(), t6),
+                                              useRegister(mod->rhs()),
+                                              tempFixed(t6));
+    if (mod->fallible() && !assignSnapshot(lir, Bailout_BaselineInfo))
+        return false;
+    return defineFixed(lir, mod, LAllocation(AnyRegister(t7)));
 }
 
 bool
-LIRGeneratorMIPS::lowerUrshD(MUrsh *mir)
+LIRGeneratorMIPSShared::lowerUrshD(MUrsh *mir)
 {
     MDefinition *lhs = mir->lhs();
     MDefinition *rhs = mir->rhs();
@@ -216,23 +291,32 @@ LIRGeneratorMIPS::lowerUrshD(MUrsh *mir)
 #endif
 
     LUse lhsUse = useRegisterAtStart(lhs);
-    LAllocation rhsAlloc = rhs->isConstant() ? useOrConstant(rhs) : useFixed(rhs, t8/*ecx*/);
+    LAllocation rhsAlloc = rhs->isConstant() ? useOrConstant(rhs) : useFixed(rhs, ecx);
 
-    LUrshD *lir = new LUrshD(lhsUse, rhsAlloc, tempCopy(lhs, 0));
+    LUrshD *lir = new(alloc()) LUrshD(lhsUse, rhsAlloc, tempCopy(lhs, 0));
     return define(lir, mir);
 }
 
 bool
-LIRGeneratorMIPS::lowerConstantDouble(double d, MInstruction *mir)
+LIRGeneratorMIPSShared::lowerConstantDouble(double d, MInstruction *mir)
 {
-    return define(new LDouble(d), mir);
+    return define(new(alloc()) LDouble(d), mir);
 }
 
 bool
-LIRGeneratorMIPS::visitConstant(MConstant *ins)
+LIRGeneratorMIPSShared::lowerConstantFloat32(float f, MInstruction *mir)
+{
+    return define(new(alloc()) LFloat32(f), mir);
+}
+
+bool
+LIRGeneratorMIPSShared::visitConstant(MConstant *ins)
 {
     if (ins->type() == MIRType_Double)
         return lowerConstantDouble(ins->value().toDouble(), ins);
+
+    if (ins->type() == MIRType_Float32)
+        return lowerConstantFloat32(ins->value().toDouble(), ins);
 
     // Emit non-double constants at their uses.
     if (ins->canEmitAtUses())
@@ -242,18 +326,48 @@ LIRGeneratorMIPS::visitConstant(MConstant *ins)
 }
 
 bool
-LIRGeneratorMIPS::lowerTruncateDToInt32(MTruncateToInt32 *ins)
+LIRGeneratorMIPSShared::lowerTruncateDToInt32(MTruncateToInt32 *ins)
 {
     MDefinition *opd = ins->input();
     JS_ASSERT(opd->type() == MIRType_Double);
 
-  //  LDefinition maybeTemp = Assembler::HasSSE3() ? LDefinition::BogusTemp() : tempFloat();
-    LDefinition maybeTemp = tempFloat();
-    return define(new LTruncateDToInt32(useRegister(opd), maybeTemp), ins);
+    LDefinition maybeTemp = Assembler::HasSSE3() ? LDefinition::BogusTemp() : tempDouble();
+    return define(new(alloc()) LTruncateDToInt32(useRegister(opd), maybeTemp), ins);
 }
 
+bool
+LIRGeneratorMIPSShared::lowerTruncateFToInt32(MTruncateToInt32 *ins)
+{
+    MDefinition *opd = ins->input();
+    JS_ASSERT(opd->type() == MIRType_Float32);
 
-//following is from x86
+    LDefinition maybeTemp = Assembler::HasSSE3() ? LDefinition::BogusTemp() : tempFloat32();
+    return define(new(alloc()) LTruncateFToInt32(useRegister(opd), maybeTemp), ins);
+}
+
+LDefinition
+LIRGeneratorMIPS::tempForDispatchCache(MIRType outputType)
+{
+    // x86 doesn't have a scratch register and we need one for the
+    // indirect jump for dispatch-style ICs.
+    //
+    // Note that currently we only install dispatch-style ICs for parallel
+    // execution. If this assumption changes, please change it here.
+    if (gen->info().executionMode() != ParallelExecution)
+        return LDefinition::BogusTemp();
+
+    // If we don't have an output register, we need a temp.
+    if (outputType == MIRType_None)
+        return temp();
+
+    // If we have a double output register, we need a temp.
+    if (outputType == MIRType_Double)
+        return temp();
+
+    // Otherwise we have a non-double output register and we can reuse it.
+    return LDefinition::BogusTemp();
+}
+
 bool
 LIRGeneratorMIPS::useBox(LInstruction *lir, size_t n, MDefinition *mir,
                         LUse::Policy policy, bool useAtStart)
@@ -281,22 +395,35 @@ LIRGeneratorMIPS::useBoxFixed(LInstruction *lir, size_t n, MDefinition *mir, Reg
     return true;
 }
 
+LAllocation
+LIRGeneratorMIPS::useByteOpRegister(MDefinition *mir)
+{
+    return useFixed(mir, t6);
+}
+
+LAllocation
+LIRGeneratorMIPS::useByteOpRegisterOrNonDoubleConstant(MDefinition *mir)
+{
+    return useFixed(mir, t6);
+}
+
 bool
 LIRGeneratorMIPS::visitBox(MBox *box)
 {
     MDefinition *inner = box->getOperand(0);
 
     // If the box wrapped a double, it needs a new register.
-    if (inner->type() == MIRType_Double)
-        return defineBox(new LBoxDouble(useRegisterAtStart(inner), tempCopy(inner, 0)), box);
+    if (IsFloatingPointType(inner->type()))
+        return defineBox(new(alloc()) LBoxFloatingPoint(useRegisterAtStart(inner), tempCopy(inner, 0),
+                                                        inner->type()), box);
 
     if (box->canEmitAtUses())
         return emitAtUses(box);
 
     if (inner->isConstant())
-        return defineBox(new LValue(inner->toConstant()->value()), box);
+        return defineBox(new(alloc()) LValue(inner->toConstant()->value()), box);
 
-    LBox *lir = new LBox(use(inner), inner->type());
+    LBox *lir = new(alloc()) LBox(use(inner), inner->type());
 
     // Otherwise, we should not define a new register for the payload portion
     // of the output, so bypass defineBox().
@@ -328,17 +455,17 @@ LIRGeneratorMIPS::visitUnbox(MUnbox *unbox)
     if (!ensureDefined(inner))
         return false;
 
-    if (unbox->type() == MIRType_Double) {
-        LUnboxDouble *lir = new LUnboxDouble;
+    if (IsFloatingPointType(unbox->type())) {
+        LUnboxFloatingPoint *lir = new(alloc()) LUnboxFloatingPoint(unbox->type());
         if (unbox->fallible() && !assignSnapshot(lir, unbox->bailoutKind()))
             return false;
-        if (!useBox(lir, LUnboxDouble::Input, inner))
+        if (!useBox(lir, LUnboxFloatingPoint::Input, inner))
             return false;
         return define(lir, unbox);
     }
 
     // Swap the order we use the box pieces so we can re-use the payload register.
-    LUnbox *lir = new LUnbox;
+    LUnbox *lir = new(alloc()) LUnbox;
     lir->setOperand(0, usePayloadInRegisterAtStart(inner));
     lir->setOperand(1, useType(inner, LUse::ANY));
 
@@ -360,7 +487,7 @@ LIRGeneratorMIPS::visitReturn(MReturn *ret)
     MDefinition *opd = ret->getOperand(0);
     JS_ASSERT(opd->type() == MIRType_Value);
 
-    LReturn *ins = new LReturn;
+    LReturn *ins = new(alloc()) LReturn;
     ins->setOperand(0, LUse(JSReturnReg_Type));
     ins->setOperand(1, LUse(JSReturnReg_Data));
     return fillBoxUses(ins, 0, opd) && add(ins);
@@ -401,84 +528,81 @@ LIRGeneratorMIPS::lowerUntypedPhiInput(MPhi *phi, uint32_t inputPosition, LBlock
 }
 
 bool
-LIRGeneratorMIPS::visitStoreTypedArrayElement(MStoreTypedArrayElement *ins)
-{
-    JS_ASSERT(ins->elements()->type() == MIRType_Elements);
-    JS_ASSERT(ins->index()->type() == MIRType_Int32);
-
-    if (ins->isFloatArray())
-        JS_ASSERT(ins->value()->type() == MIRType_Double);
-    else
-        JS_ASSERT(ins->value()->type() == MIRType_Int32);
-
-    LUse elements = useRegister(ins->elements());
-    LAllocation index = useRegisterOrConstant(ins->index());
-    LAllocation value;
-
-    // For byte arrays, the value has to be in a byte register on x86.
-    if (ins->isByteArray())
-        value = useFixed(ins->value(), t6/*eax*/);
-    else
-        value = useRegisterOrNonDoubleConstant(ins->value());
-    return add(new LStoreTypedArrayElement(elements, index, value), ins);
-}
-
-bool
-LIRGeneratorMIPS::visitStoreTypedArrayElementHole(MStoreTypedArrayElementHole *ins)
-{
-    JS_ASSERT(ins->elements()->type() == MIRType_Elements);
-    JS_ASSERT(ins->index()->type() == MIRType_Int32);
-    JS_ASSERT(ins->length()->type() == MIRType_Int32);
-
-    if (ins->isFloatArray())
-        JS_ASSERT(ins->value()->type() == MIRType_Double);
-    else
-        JS_ASSERT(ins->value()->type() == MIRType_Int32);
-
-    LUse elements = useRegister(ins->elements());
-    LAllocation length = useAnyOrConstant(ins->length());
-    LAllocation index = useRegisterOrConstant(ins->index());
-    LAllocation value;
-
-    // For byte arrays, the value has to be in a byte register on x86.
-    if (ins->isByteArray())
-        value = useFixed(ins->value(), t6/*eax*/);
-    else
-        value = useRegisterOrNonDoubleConstant(ins->value());
-    return add(new LStoreTypedArrayElementHole(elements, length, index, value), ins);
-}
-
-bool
 LIRGeneratorMIPS::visitAsmJSUnsignedToDouble(MAsmJSUnsignedToDouble *ins)
 {
     JS_ASSERT(ins->input()->type() == MIRType_Int32);
-    LUInt32ToDouble *lir = new LUInt32ToDouble(useRegisterAtStart(ins->input()), temp());
+    LAsmJSUInt32ToDouble *lir = new(alloc()) LAsmJSUInt32ToDouble(useRegisterAtStart(ins->input()), temp());
+    return define(lir, ins);
+}
+
+bool
+LIRGeneratorMIPS::visitAsmJSUnsignedToFloat32(MAsmJSUnsignedToFloat32 *ins)
+{
+    JS_ASSERT(ins->input()->type() == MIRType_Int32);
+    LAsmJSUInt32ToFloat32 *lir = new(alloc()) LAsmJSUInt32ToFloat32(useRegisterAtStart(ins->input()), temp());
+    return define(lir, ins);
+}
+
+bool
+LIRGeneratorMIPS::visitAsmJSLoadHeap(MAsmJSLoadHeap *ins)
+{
+    MDefinition *ptr = ins->ptr();
+    LAllocation ptrAlloc;
+    JS_ASSERT(ptr->type() == MIRType_Int32);
+
+    // For the x86 it is best to keep the 'ptr' in a register if a bounds check is needed.
+    if (ptr->isConstant() && ins->skipBoundsCheck()) {
+        int32_t ptrValue = ptr->toConstant()->value().toInt32();
+        // A bounds check is only skipped for a positive index.
+        JS_ASSERT(ptrValue >= 0);
+        ptrAlloc = LAllocation(ptr->toConstant()->vp());
+    } else {
+        ptrAlloc = useRegisterAtStart(ptr);
+    }
+    LAsmJSLoadHeap *lir = new(alloc()) LAsmJSLoadHeap(ptrAlloc);
     return define(lir, ins);
 }
 
 bool
 LIRGeneratorMIPS::visitAsmJSStoreHeap(MAsmJSStoreHeap *ins)
 {
+    MDefinition *ptr = ins->ptr();
     LAsmJSStoreHeap *lir;
+    JS_ASSERT(ptr->type() == MIRType_Int32);
+
+    if (ptr->isConstant() && ins->skipBoundsCheck()) {
+        int32_t ptrValue = ptr->toConstant()->value().toInt32();
+        JS_ASSERT(ptrValue >= 0);
+        LAllocation ptrAlloc = LAllocation(ptr->toConstant()->vp());
+        switch (ins->viewType()) {
+          case ArrayBufferView::TYPE_INT8: case ArrayBufferView::TYPE_UINT8:
+            // See comment below.
+            lir = new(alloc()) LAsmJSStoreHeap(ptrAlloc, useFixed(ins->value(), t6));
+            break;
+          case ArrayBufferView::TYPE_INT16: case ArrayBufferView::TYPE_UINT16:
+          case ArrayBufferView::TYPE_INT32: case ArrayBufferView::TYPE_UINT32:
+          case ArrayBufferView::TYPE_FLOAT32: case ArrayBufferView::TYPE_FLOAT64:
+            // See comment below.
+            lir = new(alloc()) LAsmJSStoreHeap(ptrAlloc, useRegisterAtStart(ins->value()));
+            break;
+          default: MOZ_ASSUME_UNREACHABLE("unexpected array type");
+        }
+        return add(lir, ins);
+    }
+
     switch (ins->viewType()) {
       case ArrayBufferView::TYPE_INT8: case ArrayBufferView::TYPE_UINT8:
-        // It's a trap! On x86, the 1-byte store can only use one of
-        // {al,bl,cl,dl,ah,bh,ch,dh}. That means if the register allocator
-        // gives us one of {edi,esi,ebp,esp}, we're out of luck. (The formatter
-        // will assert on us.) Ideally, we'd just ask the register allocator to
-        // give us one of {al,bl,cl,dl}. For now, just useFixed(al).
-        lir = new LAsmJSStoreHeap(useRegister(ins->ptr()),
-                                  useFixed(ins->value(), t6/*eax*/));
+        // See comment for LIRGeneratorMIPS::useByteOpRegister.
+        lir = new(alloc()) LAsmJSStoreHeap(useRegister(ins->ptr()), useFixed(ins->value(), t6));
         break;
       case ArrayBufferView::TYPE_INT16: case ArrayBufferView::TYPE_UINT16:
       case ArrayBufferView::TYPE_INT32: case ArrayBufferView::TYPE_UINT32:
       case ArrayBufferView::TYPE_FLOAT32: case ArrayBufferView::TYPE_FLOAT64:
-        // For now, don't allow constants. The immediate operand affects
-        // instruction layout which affects patching.
-        lir = new LAsmJSStoreHeap(useRegisterAtStart(ins->ptr()),
-                                  useRegisterAtStart(ins->value()));
+        // For now, don't allow constant values. The immediate operand
+        // affects instruction layout which affects patching.
+        lir = new(alloc()) LAsmJSStoreHeap(useRegisterAtStart(ptr), useRegisterAtStart(ins->value()));
         break;
-      default: JS_NOT_REACHED("unexpected array type");
+      default: MOZ_ASSUME_UNREACHABLE("unexpected array type");
     }
 
     return add(lir, ins);
@@ -493,16 +617,16 @@ LIRGeneratorMIPS::visitStoreTypedArrayElementStatic(MStoreTypedArrayElementStati
     switch (ins->viewType()) {
       case ArrayBufferView::TYPE_INT8: case ArrayBufferView::TYPE_UINT8:
       case ArrayBufferView::TYPE_UINT8_CLAMPED:
-        lir = new LStoreTypedArrayElementStatic(useRegister(ins->ptr()),
-                                                useFixed(ins->value(), t6/*eax*/));
+        lir = new(alloc()) LStoreTypedArrayElementStatic(useRegister(ins->ptr()),
+                                                         useFixed(ins->value(), t6));
         break;
       case ArrayBufferView::TYPE_INT16: case ArrayBufferView::TYPE_UINT16:
       case ArrayBufferView::TYPE_INT32: case ArrayBufferView::TYPE_UINT32:
       case ArrayBufferView::TYPE_FLOAT32: case ArrayBufferView::TYPE_FLOAT64:
-        lir = new LStoreTypedArrayElementStatic(useRegisterAtStart(ins->ptr()),
-                                                useRegisterAtStart(ins->value()));
+        lir = new(alloc()) LStoreTypedArrayElementStatic(useRegisterAtStart(ins->ptr()),
+                                                         useRegisterAtStart(ins->value()));
         break;
-      default: JS_NOT_REACHED("unexpected array type");
+      default: MOZ_ASSUME_UNREACHABLE("unexpected array type");
     }
 
     return add(lir, ins);
@@ -511,19 +635,5 @@ LIRGeneratorMIPS::visitStoreTypedArrayElementStatic(MStoreTypedArrayElementStati
 bool
 LIRGeneratorMIPS::visitAsmJSLoadFuncPtr(MAsmJSLoadFuncPtr *ins)
 {
-    return define(new LAsmJSLoadFuncPtr(useRegisterAtStart(ins->index())), ins);
-}
-
-LGetPropertyCacheT *
-LIRGeneratorMIPS::newLGetPropertyCacheT(MGetPropertyCache *ins)
-{
-    // Since x86 doesn't have a scratch register and we need one for the
-    // indirect jump for dispatch-style ICs, we need a temporary in the case
-    // of a double output type as we can't get a scratch from the output.
-    LDefinition scratch;
-    if (ins->type() == MIRType_Double)
-        scratch = temp();
-    else
-        scratch = LDefinition::BogusTemp();
-    return new LGetPropertyCacheT(useRegister(ins->object()), scratch);
+    return define(new(alloc()) LAsmJSLoadFuncPtr(useRegisterAtStart(ins->index())), ins);
 }

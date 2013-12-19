@@ -32,7 +32,7 @@
 
 #if ENABLE_ASSEMBLER && WTF_CPU_MIPS
 
-#include "MacroAssemblerMIPS.h"
+#include "assembler/assembler/MacroAssemblerMIPS.h"
 
 using namespace JSC;
 

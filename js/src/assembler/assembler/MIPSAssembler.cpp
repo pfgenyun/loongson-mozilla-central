@@ -33,7 +33,7 @@
 
 #if ENABLE(ASSEMBLER) && CPU(MIPS)
 
-#include "MIPSAssembler.h"
+#include "assembler/assembler/MIPSAssembler.h"
 
 namespace JSC {
 

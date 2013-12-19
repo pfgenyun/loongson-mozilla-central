@@ -1,12 +1,12 @@
-/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=4 sw=4 et tw=99:
- *
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
+ * vim: set ts=8 sts=4 et sw=4 tw=99:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #ifndef jit_mips_LIR_mips_h
 #define jit_mips_LIR_mips_h
+
 namespace js {
 namespace jit {
 
@@ -26,16 +26,31 @@ class LBox : public LInstructionHelper<2, 1, 0>
     MIRType type() const {
         return type_;
     }
+    const char *extraName() const {
+        return StringFromMIRType(type_);
+    }
 };
 
-class LBoxDouble : public LInstructionHelper<2, 1, 1>
+class LBoxFloatingPoint : public LInstructionHelper<2, 1, 1>
 {
-  public:
-    LIR_HEADER(BoxDouble);
+    MIRType type_;
 
-    LBoxDouble(const LAllocation &in, const LDefinition &temp) {
+  public:
+    LIR_HEADER(BoxFloatingPoint);
+
+    LBoxFloatingPoint(const LAllocation &in, const LDefinition &temp, MIRType type)
+      : type_(type)
+    {
+        JS_ASSERT(IsFloatingPointType(type));
         setOperand(0, in);
         setTemp(0, temp);
+    }
+
+    MIRType type() const {
+        return type_;
+    }
+    const char *extraName() const {
+        return StringFromMIRType(type_);
     }
 };
 
@@ -53,39 +68,58 @@ class LUnbox : public LInstructionHelper<1, 2, 0>
     const LAllocation *type() {
         return getOperand(1);
     }
+    const char *extraName() const {
+        return StringFromMIRType(mir()->type());
+    }
 };
 
-class LUnboxDouble : public LInstructionHelper<1, 2, 0>
+class LUnboxFloatingPoint : public LInstructionHelper<1, 2, 0>
 {
+    MIRType type_;
+
   public:
-    LIR_HEADER(UnboxDouble);
+    LIR_HEADER(UnboxFloatingPoint);
 
     static const size_t Input = 0;
+
+    LUnboxFloatingPoint(MIRType type)
+      : type_(type)
+    { }
 
     MUnbox *mir() const {
         return mir_->toUnbox();
     }
-};
 
-// Constant double.
-/*class LDouble : public LInstructionHelper<1, 1, 0>
-{
-  public:
-    LIR_HEADER(Double);
-
-    LDouble(const LConstantIndex &cindex) {
-        setOperand(0, cindex);
+    MIRType type() const {
+        return type_;
+    }
+    const char *extraName() const {
+        return StringFromMIRType(type_);
     }
 };
-*/
 
 // Convert a 32-bit unsigned integer to a double.
-class LUInt32ToDouble : public LInstructionHelper<1, 1, 1>
+class LAsmJSUInt32ToDouble : public LInstructionHelper<1, 1, 1>
 {
   public:
-    LIR_HEADER(UInt32ToDouble)
+    LIR_HEADER(AsmJSUInt32ToDouble)
 
-    LUInt32ToDouble(const LAllocation &input, const LDefinition &temp) {
+    LAsmJSUInt32ToDouble(const LAllocation &input, const LDefinition &temp) {
+        setOperand(0, input);
+        setTemp(0, temp);
+    }
+    const LDefinition *temp() {
+        return getTemp(0);
+    }
+};
+
+// Convert a 32-bit unsigned integer to a float32.
+class LAsmJSUInt32ToFloat32: public LInstructionHelper<1, 1, 1>
+{
+  public:
+    LIR_HEADER(AsmJSUInt32ToFloat32)
+
+    LAsmJSUInt32ToFloat32(const LAllocation &input, const LDefinition &temp) {
         setOperand(0, input);
         setTemp(0, temp);
     }
@@ -120,7 +154,7 @@ class LDivI : public LBinaryMath<1>
         setOperand(1, rhs);
         setTemp(0, temp);
     }
-//NOTE : This is new in ff24
+
     const char *extraName() const {
         if (mir()->isTruncated()) {
             if (mir()->canBeNegativeZero()) {
@@ -132,7 +166,7 @@ class LDivI : public LBinaryMath<1>
         }
         if (mir()->canBeNegativeZero())
             return mir()->canBeNegativeOverflow() ? "NegativeZero_NegativeOverflow" : "NegativeZero";
-        return mir()->canBeNegativeOverflow() ? "NegativeOverflow" : NULL;
+        return mir()->canBeNegativeOverflow() ? "NegativeOverflow" : nullptr;
     }
 
     const LDefinition *remainder() {
@@ -172,38 +206,75 @@ class LDivPowTwoI : public LBinaryMath<0>
     }
 };
 
+// Division of a number by itself. Returns 1 unless the number is zero.
+class LDivSelfI : public LInstructionHelper<1, 1, 0>
+{
+  public:
+    LIR_HEADER(DivSelfI)
+
+    LDivSelfI(const LAllocation &op) {
+        setOperand(0, op);
+    }
+
+    const LAllocation *op() {
+        return getOperand(0);
+    }
+
+    MDiv *mir() const {
+        return mir_->toDiv();
+    }
+};
+
 class LModI : public LBinaryMath<1>
 {
   public:
     LIR_HEADER(ModI)
-//NOTE: this is update in ff24
+
     LModI(const LAllocation &lhs, const LAllocation &rhs, const LDefinition &temp) {
         setOperand(0, lhs);
         setOperand(1, rhs);
         setTemp(0, temp);
     }
-    
-    //NOTE:this is new in ff24
-   const char *extraName() const {
-        return mir()->isTruncated() ? "Truncated" : NULL;
+
+    const char *extraName() const {
+        return mir()->isTruncated() ? "Truncated" : nullptr;
     }
+
     const LDefinition *remainder() {
         return getDef(0);
     }
-  // NOTE:this is new in ff24
-        MMod *mir() const {
+    MMod *mir() const {
         return mir_->toMod();
     }
 };
-    //NOTE:this is new in ff24
-// This class performs a simple x86 'div', yielding either a quotient or remainder depending on
-// whether this instruction is defined to output eax (quotient) or edx (remainder).
-class LAsmJSDivOrMod : public LBinaryMath<1>
+
+// Modulo of a number by itself. Returns 0 unless the number is zero.
+class LModSelfI : public LInstructionHelper<1, 1, 0>
 {
   public:
-    LIR_HEADER(AsmJSDivOrMod);
+    LIR_HEADER(ModSelfI)
 
-    LAsmJSDivOrMod(const LAllocation &lhs, const LAllocation &rhs, const LDefinition &temp) {
+    LModSelfI(const LAllocation &op) {
+        setOperand(0, op);
+    }
+
+    const LAllocation *op() {
+        return getOperand(0);
+    }
+
+    MMod *mir() const {
+        return mir_->toMod();
+    }
+};
+
+// This class performs a simple mips 'div', yielding either a quotient or remainder depending on
+// whether this instruction is defined to output eax (quotient) or edx (remainder).
+class LUDivOrMod : public LBinaryMath<1>
+{
+  public:
+    LIR_HEADER(UDivOrMod);
+
+    LUDivOrMod(const LAllocation &lhs, const LAllocation &rhs, const LDefinition &temp) {
         setOperand(0, lhs);
         setOperand(1, rhs);
         setTemp(0, temp);
@@ -212,12 +283,26 @@ class LAsmJSDivOrMod : public LBinaryMath<1>
     const LDefinition *remainder() {
         return getTemp(0);
     }
-};
 
+    const char *extraName() const {
+        return mir()->isTruncated() ? "Truncated" : nullptr;
+    }
+
+    MBinaryArithInstruction *mir() const {
+        JS_ASSERT(mir_->isDiv() || mir_->isMod());
+        return static_cast<MBinaryArithInstruction *>(mir_);
+    }
+
+    bool canBeDivideByZero() const {
+        if (mir_->isMod())
+            return mir_->toMod()->canBeDivideByZero();
+        return mir_->toDiv()->canBeDivideByZero();
+    }
+};
 
 class LModPowTwoI : public LInstructionHelper<1,1,0>
 {
-    const int32_t  shift_;
+    const int32_t shift_;
 
   public:
     LIR_HEADER(ModPowTwoI)
@@ -234,30 +319,28 @@ class LModPowTwoI : public LInstructionHelper<1,1,0>
     const LDefinition *remainder() {
         return getDef(0);
     }
-        //NOTE:this is new in ff24
-        MMod *mir() const {
+    MMod *mir() const {
         return mir_->toMod();
     }
 };
 
 // Double raised to a half power.
-class LPowHalfD : public LInstructionHelper<1, 1, 1>
+class LPowHalfD : public LInstructionHelper<1, 1, 0>
 {
   public:
     LIR_HEADER(PowHalfD)
-    LPowHalfD(const LAllocation &input, const LDefinition &temp) {
+    LPowHalfD(const LAllocation &input) {
         setOperand(0, input);
-        setTemp(0, temp);
     }
 
     const LAllocation *input() {
         return getOperand(0);
     }
-    const LDefinition *temp() {
-        return getTemp(0);
-    }
     const LDefinition *output() {
         return getDef(0);
+    }
+    MPowHalf *mir() const {
+        return mir_->toPowHalf();
     }
 };
 
@@ -283,11 +366,11 @@ class LTableSwitch : public LInstructionHelper<0, 1, 2>
     const LAllocation *index() {
         return getOperand(0);
     }
-    const LAllocation *tempInt() {
-        return getTemp(0)->output();
+    const LDefinition *tempInt() {
+        return getTemp(0);
     }
-    const LAllocation *tempPointer() {
-        return getTemp(1)->output();
+    const LDefinition *tempPointer() {
+        return getTemp(1);
     }
 };
 
@@ -312,18 +395,17 @@ class LTableSwitchV : public LInstructionHelper<0, BOX_PIECES, 3>
 
     static const size_t InputValue = 0;
 
-    const LAllocation *tempInt() {
-        return getTemp(0)->output();
+    const LDefinition *tempInt() {
+        return getTemp(0);
     }
-    const LAllocation *tempFloat() {
-        return getTemp(1)->output();
+    const LDefinition *tempFloat() {
+        return getTemp(1);
     }
-    const LAllocation *tempPointer() {
-        return getTemp(2)->output();
+    const LDefinition *tempPointer() {
+        return getTemp(2);
     }
 };
 
-// Guard against an object's shape.
 class LGuardShape : public LInstructionHelper<0, 1, 0>
 {
   public:
@@ -337,18 +419,6 @@ class LGuardShape : public LInstructionHelper<0, 1, 0>
     }
 };
 
-//this function is deleted
-/*class LRecompileCheck : public LInstructionHelper<0, 0, 0>
-{
-  public:
-    LIR_HEADER(RecompileCheck);
-
-    const MRecompileCheck *mir() const {
-        return mir_->toRecompileCheck();
-    }
-};
-*/
-      //NOTE:this is new in ff24
 class LGuardObjectType : public LInstructionHelper<0, 1, 0>
 {
   public:
@@ -361,8 +431,7 @@ class LGuardObjectType : public LInstructionHelper<0, 1, 0>
         return mir_->toGuardObjectType();
     }
 };
-      
-      
+
 class LInterruptCheck : public LInstructionHelper<0, 0, 0>
 {
   public:
@@ -379,14 +448,14 @@ class LMulI : public LBinaryMath<0, 1>
         setOperand(1, rhs);
         setOperand(2, lhsCopy);
     }
-//NOTE: this is new in ff24
+
     const char *extraName() const {
         return (mir()->mode() == MMul::Integer)
                ? "Integer"
-               : (mir()->canBeNegativeZero() ? "CanBeNegativeZero" : NULL);
+               : (mir()->canBeNegativeZero() ? "CanBeNegativeZero" : nullptr);
     }
 
-    MMul *mir() const{
+    MMul *mir() const {
         return mir_->toMul();
     }
     const LAllocation *lhsCopy() {
@@ -397,6 +466,4 @@ class LMulI : public LBinaryMath<0, 1>
 } // namespace jit
 } // namespace js
 
-#endif // jsjit_lir_mips_h__
-
-
+#endif /* jit_mips_LIR_mips_h */

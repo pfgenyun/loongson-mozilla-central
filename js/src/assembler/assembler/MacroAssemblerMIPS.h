@@ -2076,7 +2076,7 @@ public:
 
     void ret(int imm)
     {
-        add32(TrustedImm32(imm), MIPSRegister::sp);
+        add32(TrustedImm32(imm), MIPSRegisters::sp);
         m_assembler.jr(MIPSRegisters::ra);
         m_assembler.nop();
     }
@@ -2420,6 +2420,7 @@ public:
             m_assembler.lwc1(dest, addrTempRegister, address.offset);
             m_assembler.lwc1(FPRegisterID(dest + 1), addrTempRegister, address.offset + 4);
         } else {
+            /*
                 sll     addrTemp, address.index, address.scale
                 addu    addrTemp, addrTemp, address.base
                 li      immTemp, address.offset
@@ -2434,6 +2435,7 @@ public:
                              immTempRegister);
             m_assembler.lwc1(dest, addrTempRegister, 0);
             m_assembler.lwc1(FPRegisterID(dest + 1), addrTempRegister, 4);
+        }
 #else
         if (address.offset >= -32768 && address.offset <= 32767
             && !m_fixedWidth) {

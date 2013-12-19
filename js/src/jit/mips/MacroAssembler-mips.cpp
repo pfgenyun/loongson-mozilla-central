@@ -1,67 +1,136 @@
-/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=4 sw=4 et tw=99:
- *
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
+ * vim: set ts=8 sts=4 et sw=4 tw=99:
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "MacroAssembler-mips.h"
-#include "jit/MoveEmitter.h"
+#include "jit/mips/MacroAssembler-mips.h"
+
+#include "mozilla/Casting.h"
+
+#include "jit/Bailouts.h"
+#include "jit/BaselineFrame.h"
 #include "jit/IonFrames.h"
+#include "jit/MoveEmitter.h"
 
 #include "jsscriptinlines.h"
 
 using namespace js;
 using namespace js::jit;
 
-//NOTE*:this function is a copy of x86 !
-void
-MacroAssemblerMIPS::loadConstantDouble(double d, const FloatRegister &dest)
+MacroAssemblerMIPS::Double *
+MacroAssemblerMIPS::getDouble(double d)
 {
-    union DoublePun {
-        uint64_t u;
-        double d;
-    } dpun;
-    dpun.d = d;
-    if (maybeInlineDouble(dpun.u, dest))
-        return;
-
     if (!doubleMap_.initialized()) {
         enoughMemory_ &= doubleMap_.init();
         if (!enoughMemory_)
-            return;
+            return nullptr;
     }
     size_t doubleIndex;
     DoubleMap::AddPtr p = doubleMap_.lookupForAdd(d);
     if (p) {
-        doubleIndex = p->value;
+        doubleIndex = p->value();
     } else {
         doubleIndex = doubles_.length();
         enoughMemory_ &= doubles_.append(Double(d));
         enoughMemory_ &= doubleMap_.add(p, d, doubleIndex);
         if (!enoughMemory_)
-            return;
+            return nullptr;
     }
-    Double &dbl = doubles_[doubleIndex]; 
- //  masm.movsd_mr(reinterpret_cast<void *>(dbl.uses.prev()), dest.code());
-   mcss.loadDouble(reinterpret_cast<void *>(dbl.uses.prev()), dest.code());
- 
-    dbl.uses.setPrev(masm.size());
+    Double &dbl = doubles_[doubleIndex];
+    JS_ASSERT(!dbl.uses.bound());
+    return &dbl;
 }
 
+void
+MacroAssemblerMIPS::loadConstantDouble(double d, const FloatRegister &dest)
+{
+    if (maybeInlineDouble(d, dest))
+        return;
+    Double *dbl = getDouble(d);
+    if (!dbl)
+        return;
+//    masm.movsd_mr(reinterpret_cast<const void *>(dbl->uses.prev()), dest.code());
+    mcss.loadDouble(reinterpret_cast<void *>(dbl.uses.prev()), dest.code());
+    dbl->uses.setPrev(masm.size());
+}
 
+void
+MacroAssemblerMIPS::addConstantDouble(double d, const FloatRegister &dest)
+{
+    Double *dbl = getDouble(d);
+    if (!dbl)
+        return;
+//    masm.addsd_mr(reinterpret_cast<const void *>(dbl->uses.prev()), dest.code());  // need to modify . by wangqing
+    masm.addDouble(reinterpret_cast<const void *>(dbl->uses.prev()), dest.code()); 
+    dbl->uses.setPrev(masm.size());
+}
 
-//NOTE*:this function is a copy of x86 !
+MacroAssemblerMIPS::Float *
+MacroAssemblerMIPS::getFloat(float f)
+{
+    if (!floatMap_.initialized()) {
+        enoughMemory_ &= floatMap_.init();
+        if (!enoughMemory_)
+            return nullptr;
+    }
+    size_t floatIndex;
+    FloatMap::AddPtr p = floatMap_.lookupForAdd(f);
+    if (p) {
+        floatIndex = p->value();
+    } else {
+        floatIndex = floats_.length();
+        enoughMemory_ &= floats_.append(Float(f));
+        enoughMemory_ &= floatMap_.add(p, f, floatIndex);
+        if (!enoughMemory_)
+            return nullptr;
+    }
+    Float &flt = floats_[floatIndex];
+    JS_ASSERT(!flt.uses.bound());
+    return &flt;
+}
+
+void
+MacroAssemblerMIPS::loadConstantFloat32(float f, const FloatRegister &dest)
+{
+    if (maybeInlineFloat(f, dest))
+        return;
+    Float *flt = getFloat(f);
+    if (!flt)
+        return;
+//    masm.movss_mr(reinterpret_cast<const void *>(flt->uses.prev()), dest.code());
+   mcss.loadFloat(reinterpret_cast<void *>(dbl.uses.prev()), dest.code());
+    flt->uses.setPrev(masm.size());
+}
+
+void
+MacroAssemblerMIPS::addConstantFloat32(float f, const FloatRegister &dest)
+{
+    Float *flt = getFloat(f);
+    if (!flt)
+        return;
+//    masm.addss_mr(reinterpret_cast<const void *>(flt->uses.prev()), dest.code()); // need to modify. by wangqing
+    masm.addFloat(reinterpret_cast<const void *>(flt->uses.prev()), dest.code()); 
+    flt->uses.setPrev(masm.size());
+}
+
 void
 MacroAssemblerMIPS::finish()
 {
-    if (doubles_.empty())
+    if (doubles_.empty() && floats_.empty())
         return;
 
     masm.align(sizeof(double));
     for (size_t i = 0; i < doubles_.length(); i++) {
         CodeLabel cl(doubles_[i].uses);
         writeDoubleConstant(doubles_[i].value, cl.src());
+        enoughMemory_ &= addCodeLabel(cl);
+        if (!enoughMemory_)
+            return;
+    }
+    for (size_t i = 0; i < floats_.length(); i++) {
+        CodeLabel cl(floats_[i].uses);
+        writeFloatConstant(floats_[i].value, cl.src());
         enoughMemory_ &= addCodeLabel(cl);
         if (!enoughMemory_)
             return;
@@ -76,8 +145,7 @@ MacroAssemblerMIPS::setupABICall(uint32_t args)
 
     args_ = args;
     passedArgs_ = 0;
-    stackForCall_ = 16;
-//    subl(Imm32(16), sp);
+    stackForCall_ = 16; // fix me: by Quqiuwen
 }
 
 void
@@ -88,18 +156,18 @@ MacroAssemblerMIPS::setupAlignedABICall(uint32_t args)
 }
 
 void
-MacroAssemblerMIPS::setupUnalignedABICall(uint32_t args, const Register &scratch)//与X86不同，MIPS中使用的堆栈指针为sp
+MacroAssemblerMIPS::setupUnalignedABICall(uint32_t args, const Register &scratch)
 {
     setupABICall(args);
     dynamicAlignment_ = true;
 
     movl(sp, scratch);
-    andl(Imm32(~(StackAlignment - 1)), sp);//在MIPS中StackAlignment=16，将sp的后四位全部设为0
+    andl(Imm32(~(StackAlignment - 1)), sp);
     push(scratch);
 }
 
 void
-MacroAssemblerMIPS::passABIArg(const MoveOperand &from) //传递一个参数
+MacroAssemblerMIPS::passABIArg(const MoveOperand &from)
 {
     MoveOperand to;
 
@@ -258,7 +326,7 @@ MacroAssemblerMIPS::callWithABIPre(uint32_t *stackAdjust)
     }
 #endif
 }
-  //NOTE*:this is new in ff24
+
 void
 MacroAssemblerMIPS::callWithABIPost(uint32_t stackAdjust, Result result)
 {
@@ -275,49 +343,39 @@ MacroAssemblerMIPS::callWithABIPost(uint32_t stackAdjust, Result result)
     JS_ASSERT(inCall_);
     inCall_ = false;*/
 }
-/*
+
 void
-MacroAssemblerMIPS::handleException()
+MacroAssemblerMIPS::handleFailureWithHandler(void *handler)
 {
     // Reserve space for exception information.
     subl(Imm32(sizeof(ResumeFromException)), sp);
     movl(sp, a0);
 
     // Ask for an exception handler.
-    setupUnalignedABICall(1, v0);//传递一个参数，将sp的值放至v0中；
+    setupUnalignedABICall(1, v0);
     passABIArg(a0);
-    callWithABI(JS_FUNC_TO_DATA_PTR(void *, ion::HandleException));
-    
-    // Load the error value, load the new stack pointer, and return.
-    moveValue(MagicValue(JS_ION_ERROR), JSReturnOperand);
-    movl(Operand(sp, offsetof(ResumeFromException, stackPointer)), sp);
-    ret();
-}
-*/
-  //NOTE*:this is new in ff24, this  is copy of function handleException(), need to review;
-void
-MacroAssemblerMIPS::handleFailureWithHandler(void *handler)
-{
-	/*
-    // Reserve space for exception information.
-    subl(Imm32(sizeof(ResumeFromException)), esp);
-    movl(esp, eax);
-
-    // Ask for an exception handler.
-    setupUnalignedABICall(1, ecx);
-    passABIArg(eax);
     callWithABI(handler);
 
+    IonCode *excTail = GetIonContext()->runtime->jitRuntime()->getExceptionTail();
+    jmp(excTail);
+}
+
+void
+MacroAssemblerMIPS::handleFailureWithHandlerTail()
+{
+/*
     Label entryFrame;
     Label catch_;
     Label finally;
     Label return_;
+    Label bailout;
 
     loadPtr(Address(esp, offsetof(ResumeFromException, kind)), eax);
     branch32(Assembler::Equal, eax, Imm32(ResumeFromException::RESUME_ENTRY_FRAME), &entryFrame);
     branch32(Assembler::Equal, eax, Imm32(ResumeFromException::RESUME_CATCH), &catch_);
     branch32(Assembler::Equal, eax, Imm32(ResumeFromException::RESUME_FINALLY), &finally);
     branch32(Assembler::Equal, eax, Imm32(ResumeFromException::RESUME_FORCED_RETURN), &return_);
+    branch32(Assembler::Equal, eax, Imm32(ResumeFromException::RESUME_BAILOUT), &bailout);
 
     breakpoint(); // Invalid kind.
 
@@ -325,15 +383,15 @@ MacroAssemblerMIPS::handleFailureWithHandler(void *handler)
     // and return from the entry frame.
     bind(&entryFrame);
     moveValue(MagicValue(JS_ION_ERROR), JSReturnOperand);
-    movl(Operand(esp, offsetof(ResumeFromException, stackPointer)), esp);
+    loadPtr(Address(esp, offsetof(ResumeFromException, stackPointer)), esp);
     ret();
 
     // If we found a catch handler, this must be a baseline frame. Restore state
     // and jump to the catch block.
     bind(&catch_);
-    movl(Operand(esp, offsetof(ResumeFromException, target)), eax);
-    movl(Operand(esp, offsetof(ResumeFromException, framePointer)), ebp);
-    movl(Operand(esp, offsetof(ResumeFromException, stackPointer)), esp);
+    loadPtr(Address(esp, offsetof(ResumeFromException, target)), eax);
+    loadPtr(Address(esp, offsetof(ResumeFromException, framePointer)), ebp);
+    loadPtr(Address(esp, offsetof(ResumeFromException, stackPointer)), esp);
     jmp(Operand(eax));
 
     // If we found a finally block, this must be a baseline frame. Push
@@ -341,11 +399,11 @@ MacroAssemblerMIPS::handleFailureWithHandler(void *handler)
     // exception.
     bind(&finally);
     ValueOperand exception = ValueOperand(ecx, edx);
-    loadValue(Operand(esp, offsetof(ResumeFromException, exception)), exception);
+    loadValue(Address(esp, offsetof(ResumeFromException, exception)), exception);
 
-    movl(Operand(esp, offsetof(ResumeFromException, target)), eax);
-    movl(Operand(esp, offsetof(ResumeFromException, framePointer)), ebp);
-    movl(Operand(esp, offsetof(ResumeFromException, stackPointer)), esp);
+    loadPtr(Address(esp, offsetof(ResumeFromException, target)), eax);
+    loadPtr(Address(esp, offsetof(ResumeFromException, framePointer)), ebp);
+    loadPtr(Address(esp, offsetof(ResumeFromException, stackPointer)), esp);
 
     pushValue(BooleanValue(true));
     pushValue(exception);
@@ -353,30 +411,21 @@ MacroAssemblerMIPS::handleFailureWithHandler(void *handler)
 
     // Only used in debug mode. Return BaselineFrame->returnValue() to the caller.
     bind(&return_);
-    movl(Operand(esp, offsetof(ResumeFromException, framePointer)), ebp);
-    movl(Operand(esp, offsetof(ResumeFromException, stackPointer)), esp);
+    loadPtr(Address(esp, offsetof(ResumeFromException, framePointer)), ebp);
+    loadPtr(Address(esp, offsetof(ResumeFromException, stackPointer)), esp);
     loadValue(Address(ebp, BaselineFrame::reverseOffsetOfReturnValue()), JSReturnOperand);
     movl(ebp, esp);
     pop(ebp);
     ret();
-    */
-    // Reserve space for exception information.
-    subl(Imm32(sizeof(ResumeFromException)), sp);
-    movl(sp, a0);
 
-    // Ask for an exception handler.
-    setupUnalignedABICall(1, v0);//传递一个参数，将sp的值放至v0中；
-    passABIArg(a0);
-    callWithABI(JS_FUNC_TO_DATA_PTR(void *, jit::HandleException));
-    
-    // Load the error value, load the new stack pointer, and return.
-    moveValue(MagicValue(JS_ION_ERROR), JSReturnOperand);
-    movl(Operand(sp, offsetof(ResumeFromException, stackPointer)), sp);
-    ret();
-    
-    
+    // If we are bailing out to baseline to handle an exception, jump to
+    // the bailout tail stub.
+    bind(&bailout);
+    loadPtr(Address(esp, offsetof(ResumeFromException, bailoutInfo)), ecx);
+    movl(Imm32(BAILOUT_RETURN_OK), eax);
+    jmp(Operand(esp, offsetof(ResumeFromException, target)));
+*/
 }
-
 
 void
 MacroAssemblerMIPS::branchTestValue(Condition cond, const ValueOperand &value, const Value &v, Label *label)
@@ -426,22 +475,12 @@ MacroAssemblerMIPS::testNegativeZero(const FloatRegister &reg, const Register &s
     return Zero;
 }
 
-void 
-MacroAssemblerMIPS::callWithExitFrame(IonCode *target, Register dynStack) {
-    addPtr(Imm32(framePushed()), dynStack);//dynStack+当前已经使用堆栈的大小
-    makeFrameDescriptor(dynStack, IonFrame_OptimizedJS);//对dynStack左移4位，并根据IonFrame_OptimizedJS的值将dynStack的某些位置1；
-    Push(dynStack);//
-//ok    //arm : ma_callIonHalfPush
-    call(target);
-}
-
-void 
-MacroAssemblerMIPS::callWithExitFrame(IonCode *target) {
-    uint32_t descriptor = MakeFrameDescriptor(framePushed(), IonFrame_OptimizedJS);
-//cause failure when descriptor==0x4e0
-    Push(Imm32(descriptor));
-//ok    //arm : ma_callIonHalfPush
-    call(target);
+Assembler::Condition
+MacroAssemblerMIPS::testNegativeZeroFloat32(const FloatRegister &reg, const Register &scratch)
+{
+    movd(reg, scratch);
+    cmpl(scratch, Imm32(1));
+    return Overflow;
 }
 
 void 

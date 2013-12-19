@@ -102,6 +102,13 @@ struct ImmWord
 
     explicit ImmWord(uintptr_t value) : value(value)
     { }
+
+// by wangqing
+#if defined (JS_CPU_MIPS)
+    void *asPointer() {
+        return reinterpret_cast<void *>(value);
+    }
+#endif
 };
 
 #ifdef DEBUG
