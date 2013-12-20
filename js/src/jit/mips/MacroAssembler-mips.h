@@ -678,7 +678,7 @@ class MacroAssemblerMIPS : public Assembler
     }
 
     void setStackArg(const Register &reg, uint32_t arg) {
-        movl(reg, Operand(esp, arg * STACK_SLOT_SIZE));
+        movl(reg, Operand(sp, arg * STACK_SLOT_SIZE));
     }
 
     // Type testing instructions can take a tag in a register or a
@@ -1087,7 +1087,7 @@ class MacroAssemblerMIPS : public Assembler
     }
 
     void enterOsr(Register calleeToken, Register code);
-};
+
 
   protected:
     // Bytes pushed onto the frame by the callee; includes frameDepth_. This is
@@ -1602,85 +1602,34 @@ class MacroAssemblerMIPS : public Assembler
     }
 
     bool maybeInlineDouble(double d, const FloatRegister &dest) {
-        // This implements parts of "13.4 Generating constants" of 
-        // "2. Optimizing subroutines in assembly language" by Agner Fog.
-        switch (u) {
-          case 0x0000000000000000ULL: // 0.0
-            xorpd(dest, dest);//将dest置零；
-            break;
-          case 0x8000000000000000ULL: // -0.0
-            pcmpeqw(dest, dest);//MIP中未实现；在x86中，pcmpeqw是将两个XMM寄存器作比较
-            psllq(Imm32(63), dest);//MIP中未实现；
-            break;
-          case 0x3fe0000000000000ULL: // 0.5
-            pcmpeqw(dest, dest);
-            psllq(Imm32(55), dest);
-            psrlq(Imm32(2), dest);
-            break;
-          case 0x3ff0000000000000ULL: // 1.0
-            pcmpeqw(dest, dest);
-            psllq(Imm32(54), dest);
-            psrlq(Imm32(2), dest);
-            break;
-          case 0x3ff8000000000000ULL: // 1.5
-            pcmpeqw(dest, dest);
-            psllq(Imm32(53), dest);
-            psrlq(Imm32(2), dest);
-            break;
-          case 0x4000000000000000ULL: // 2.0
-            pcmpeqw(dest, dest);
-            psllq(Imm32(63), dest);
-            psrlq(Imm32(1), dest);
-            break;
-          case 0xc000000000000000ULL: // -2.0
-            pcmpeqw(dest, dest);
-            psllq(Imm32(62), dest);
-            break;
-          default:
-            return false;
+        uint64_t u = mozilla::BitwiseCast<uint64_t>(d);
+
+        // Loading zero with xor is specially optimized in hardware.
+        if (u == 0) {
+            xorpd(dest, dest);
+            return true;
         }
-        return true;
+
+        // It is also possible to load several common constants using pcmpeqw
+        // to get all ones and then psllq and psrlq to get zeros at the ends,
+        // as described in "13.4 Generating constants" of
+        // "2. Optimizing subroutines in assembly language" by Agner Fog, and as
+        // previously implemented here. However, with x86 and x64 both using
+        // constant pool loads for double constants, this is probably only
+        // worthwhile in cases where a load is likely to be delayed.
+
+        return false;
     }
 
     bool maybeInlineFloat(float f, const FloatRegister &dest) {
-         // This implements parts of "13.4 Generating constants" of 
-        // "2. Optimizing subroutines in assembly language" by Agner Fog.
-        switch (u) {
-          case 0x0000000000000000ULL: // 0.0
-            xorps(dest, dest);//将dest置零；
-            break;
-          case 0x8000000000000000ULL: // -0.0
-            pcmpeqw(dest, dest);//MIP中未实现；在x86中，pcmpeqw是将两个XMM寄存器作比较
-            psllq(Imm32(63), dest);//MIP中未实现；
-            break;
-          case 0x3fe0000000000000ULL: // 0.5
-            pcmpeqw(dest, dest);
-            psllq(Imm32(55), dest);
-            psrlq(Imm32(2), dest);
-            break;
-          case 0x3ff0000000000000ULL: // 1.0
-            pcmpeqw(dest, dest);
-            psllq(Imm32(54), dest);
-            psrlq(Imm32(2), dest);
-            break;
-          case 0x3ff8000000000000ULL: // 1.5
-            pcmpeqw(dest, dest);
-            psllq(Imm32(53), dest);
-            psrlq(Imm32(2), dest);
-            break;
-          case 0x4000000000000000ULL: // 2.0
-            pcmpeqw(dest, dest);
-            psllq(Imm32(63), dest);
-            psrlq(Imm32(1), dest);
-            break;
-          case 0xc000000000000000ULL: // -2.0
-            pcmpeqw(dest, dest);
-            psllq(Imm32(62), dest);
-            break;
-          default:
-            return false;
+        uint32_t u = mozilla::BitwiseCast<uint32_t>(f);
+
+        // See comment above
+        if (u == 0) {
+            xorps(dest, dest);
+            return true;
         }
-        return true;
+        return false;
     }
 
     void convertBoolToInt32(Register source, Register dest) {
