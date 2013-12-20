@@ -647,6 +647,14 @@ CodeGeneratorMIPS::visitAddI(LAddI *ins)
         }
     }
     return true;
+
+    if (ins->rhs()->isConstant())                                             
+    masm.addl(Imm32(ToInt32(ins->rhs())), ToOperand(ins->lhs()));            
+      else                                                                   
+    masm.addl(ToOperand(ins->rhs()), ToRegister(ins->lhs()));                
+    if (ins->snapshot() && !bailoutIf(Assembler::Overflow, ins->snapshot())) 
+          return false;                                                     
+      return true;
 }
 
 bool
@@ -1513,7 +1521,7 @@ CodeGeneratorMIPS::visitFloor(LFloor *lir)
     FloatRegister scratch = ScratchFloatReg;
     Register output = ToRegister(lir->output());
 
-    if (AssemblerX86Shared::HasSSE41()) {
+    /*if (AssemblerX86Shared::HasSSE41()) {
         // Bail on negative-zero.
         Assembler::Condition bailCond = masm.testNegativeZero(input, output);
         if (!bailoutIf(bailCond, lir->snapshot()))
@@ -1526,7 +1534,7 @@ CodeGeneratorMIPS::visitFloor(LFloor *lir)
         masm.cmp32(output, Imm32(INT_MIN));
         if (!bailoutIf(Assembler::Equal, lir->snapshot()))
             return false;
-    } else {
+    } else */{
         Label negative, end;
 
         // Branch to a slow path for negative inputs. Doesn't catch NaN or -0.
@@ -1678,7 +1686,7 @@ CodeGeneratorMIPS::visitRound(LRound *lir)
     // Input is negative, but isn't -0.
     masm.bind(&negative);
 
-    if (AssemblerX86Shared::HasSSE41()) {
+    /*if (AssemblerX86Shared::HasSSE41()) {
         // Add 0.5 and round toward -Infinity. The result is stored in the temp
         // register (currently contains 0.5).
         masm.addsd(input, temp);
@@ -1696,7 +1704,7 @@ CodeGeneratorMIPS::visitRound(LRound *lir)
         if (!bailoutIf(Assembler::Zero, lir->snapshot()))
             return false;
 
-    } else {
+    } else */{
         masm.addsd(input, temp);
 
         // Round toward -Infinity without the benefit of ROUNDSD.
@@ -2317,7 +2325,9 @@ CodeGeneratorMIPS::visitAsmJSLoadHeap(LAsmJSLoadHeap *ins)
     loadViewTypeElement(vt, srcAddr, out);
     uint32_t after = masm.size();
     masm.bind(ool->rejoin());
-    return gen->noteHeapAccess(AsmJSHeapAccess(before, after, vt, ToAnyRegister(out), cmp.offset()));
+    // return gen->noteHeapAccess(AsmJSHeapAccess(before, after, vt, ToAnyRegister(out), cmp.offset()));
+    bool temp = gen->noteHeapAccess(AsmJSHeapAccess(before, after, vt, ToAnyRegister(out), cmp.offset()));
+    return temp;
 }
 
 bool
@@ -2416,7 +2426,9 @@ CodeGeneratorMIPS::visitAsmJSStoreHeap(LAsmJSStoreHeap *ins)
     storeViewTypeElement(vt, value, dstAddr);
     uint32_t after = masm.size();
     masm.bind(&rejoin);
-    return gen->noteHeapAccess(AsmJSHeapAccess(before, after, cmp.offset()));
+    // return gen->noteHeapAccess(AsmJSHeapAccess(before, after, cmp.offset()));
+    bool temp = gen->noteHeapAccess(AsmJSHeapAccess(before, after, cmp.offset()));
+    return temp;
 }
 
 bool
@@ -2482,6 +2494,8 @@ CodeGeneratorMIPS::visitAsmJSLoadFFIFunc(LAsmJSLoadFFIFunc *ins)
 void
 CodeGeneratorMIPS::postAsmJSCall(LAsmJSCall *lir)
 {
+    // NOTE:this part is about ASM.JS in firefox,so deleted for temp
+    /*
     MAsmJSCall *mir = lir->mir();
     if (!IsFloatingPointType(mir->type()) || mir->callee().which() != MAsmJSCall::Callee::Builtin)
         return;
@@ -2495,6 +2509,7 @@ CodeGeneratorMIPS::postAsmJSCall(LAsmJSCall *lir)
         masm.fstp(op);
         masm.loadDouble(op, ReturnFloatReg);
     }
+    */
 }
 
 void
@@ -2506,7 +2521,7 @@ DispatchIonCache::initializeAddCacheState(LInstruction *ins, AddCacheState *addS
 }
 
 void
-GetPropertyIC::initializeAddCacheState(LInstruction *ins, AddCacheState *addState)
+GetPropertyParIC::initializeAddCacheState(LInstruction *ins, AddCacheState *addState)
 {
     // We don't have a scratch register, but only use the temp if we needed
     // one, it's BogusTemp otherwise.
@@ -2552,8 +2567,6 @@ SetElementParIC::initializeAddCacheState(LInstruction *ins, AddCacheState *addSt
         addState->dispatchScratch = ToRegister(ins->toSetElementCacheT()->temp());
 }
 
-namespace js {
-namespace jit {
 
 class OutOfLineTruncate : public OutOfLineCodeBase<CodeGeneratorMIPS>
 {
@@ -2589,8 +2602,6 @@ class OutOfLineTruncateFloat32 : public OutOfLineCodeBase<CodeGeneratorMIPS>
     }
 };
 
-} // namespace jit
-} // namespace js
 
 bool
 CodeGeneratorMIPS::visitTruncateDToInt32(LTruncateDToInt32 *ins)
@@ -2631,7 +2642,7 @@ CodeGeneratorMIPS::visitOutOfLineTruncate(OutOfLineTruncate *ool)
 
     Label fail;
 
-    if (Assembler::HasSSE3()) {
+    /*if (Assembler::HasSSE3()) {
         // Push double.
         masm.subl(Imm32(sizeof(double)), esp);
         masm.storeDouble(input, Operand(esp, 0));
@@ -2658,7 +2669,7 @@ CodeGeneratorMIPS::visitOutOfLineTruncate(OutOfLineTruncate *ool)
         masm.bind(&failPopDouble);
         masm.addl(Imm32(sizeof(double)), esp);
         masm.jump(&fail);
-    } else {
+    } else*/ {
         FloatRegister temp = ToFloatRegister(ins->tempFloat());
 
         // Try to convert doubles representing integers within 2^32 of a signed
@@ -2719,7 +2730,7 @@ CodeGeneratorMIPS::visitOutOfLineTruncateFloat32(OutOfLineTruncateFloat32 *ool)
 
     Label fail;
 
-    if (Assembler::HasSSE3()) {
+    /*if (Assembler::HasSSE3()) {
         // Push float32, but subtracts 64 bits so that the value popped by fisttp fits
         masm.subl(Imm32(sizeof(uint64_t)), esp);
         masm.storeFloat(input, Operand(esp, 0));
@@ -2747,7 +2758,7 @@ CodeGeneratorMIPS::visitOutOfLineTruncateFloat32(OutOfLineTruncateFloat32 *ool)
         masm.bind(&failPopFloat);
         masm.addl(Imm32(sizeof(uint64_t)), esp);
         masm.jump(&fail);
-    } else {
+    } else */{
         FloatRegister temp = ToFloatRegister(ins->tempFloat());
 
         // Try to convert float32 representing integers within 2^32 of a signed

@@ -201,9 +201,6 @@ protected:
     void postAsmJSCall(LAsmJSCall *lir);
 };
 
-typedef CodeGeneratorMIPS CodeGeneratorSpecific;
-
-
 // Following is from jit/shared/CodeGenerator-x86-shared.h;
 // An out-of-line bailout thunk.
 class OutOfLineBailout : public OutOfLineCodeBase<CodeGeneratorMIPS>
@@ -221,6 +218,9 @@ class OutOfLineBailout : public OutOfLineCodeBase<CodeGeneratorMIPS>
         return snapshot_;
     }
 };
+
+typedef CodeGeneratorMIPS CodeGeneratorSpecific;
+
 } // namespace jit
 } // namespace js
 
