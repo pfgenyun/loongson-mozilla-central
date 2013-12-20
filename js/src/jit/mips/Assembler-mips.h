@@ -243,11 +243,11 @@ class Operand
     { }
     explicit Operand(const AbsoluteAddress &address)
       : kind_(MEM_ADDRESS32),
-        disp_(JSC::MIPSAssembler::addressImmediate(address.addr))
+        base_(reinterpret_cast<int32_t>(address.addr))
     { }
     explicit Operand(const void *address)
       : kind_(MEM_ADDRESS32),
-        disp_(JSC::MIPSAssembler::addressImmediate(address))
+        base_(reinterpret_cast<int32_t>(address))
     { }
 
     Address toAddress() const {
@@ -376,6 +376,7 @@ class Assembler
         LessThanOrEqual = JSC::MacroAssemblerMIPS::LessThanOrEqual,
         Overflow = JSC::MacroAssemblerMIPS::Overflow,
         Signed = JSC::MacroAssemblerMIPS::Signed,
+        NotSigned = JSC::MacroAssemblerMIPS::NotSigned,
         Zero = JSC::MacroAssemblerMIPS::Equal,
         NonZero = JSC::MacroAssemblerMIPS::NotEqual,
         Parity = JSC::MacroAssemblerMIPS::DoubleUnordered,
@@ -609,7 +610,7 @@ class Assembler
             mcss.store32(mTrustedImm32(ptr.value), mImplicitAddress(mAddress(dest.base(), dest.disp())));
             writeDataRelocation(ptr);
             break;
-          case Operand::SCALE:
+          case Operand::MEM_SCALE:
 //ok            masm.movl_i32m(ptr.value, dest.disp(), dest.base(), dest.index(), dest.scale());
             mcss.store32(mTrustedImm32(ptr.value), mBaseIndex(dest.base(), dest.index(), mScale(dest.scale()), dest.disp()));
             writeDataRelocation(ptr);
@@ -637,10 +638,12 @@ class Assembler
     void mov(ImmPtr imm, Register dest) {
         mov(ImmWord(uintptr_t(imm.value)), dest);
     }
+    // New function
     void mov(AsmJSImmPtr imm, Register dest) {
-        masm.movl_i32r(-1, dest.code());
-        AsmJSAbsoluteLink link(masm.currentOffset(), imm.kind());
-        enoughMemory_ &= asmJSAbsoluteLinks_.append(link);
+        JS_ASSERT(0);
+        //masm.movl_i32r(-1, dest.code());
+        //AsmJSAbsoluteLink link(masm.currentOffset(), imm.kind());
+        //enoughMemory_ &= asmJSAbsoluteLinks_.append(link);
     }
     void mov(Imm32 imm, Register dest) {
         movl(imm, dest);
@@ -672,20 +675,24 @@ class Assembler
         return leal(src, dest);
     }
 
+    // New function
     void fld32(const Operand &dest) {
+        JS_ASSERT(0);
         switch (dest.kind()) {
           case Operand::MEM_REG_DISP:
-            masm.fld32_m(dest.disp(), dest.base());
+            //masm.fld32_m(dest.disp(), dest.base());
             break;
           default:
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
 
+    // New function
     void fstp32(const Operand &src) {
+        JS_ASSERT(0);
         switch (src.kind()) {
           case Operand::MEM_REG_DISP:
-            masm.fstp32_m(src.disp(), src.base());
+            //masm.fstp32_m(src.disp(), src.base());
             break;
           default:
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
@@ -715,10 +722,12 @@ class Assembler
         movl(imm,cmpTemp2Register);
         writeDataRelocation(imm);
     }
+    // New function
     void cmpl(const AsmJSAbsoluteAddress &lhs, const Register &rhs) {
-        masm.cmpl_rm_force32(rhs.code(), (void*)-1);
-        AsmJSAbsoluteLink link(masm.currentOffset(), lhs.kind());
-        enoughMemory_ &= asmJSAbsoluteLinks_.append(link);
+        JS_ASSERT(0);
+//        masm.cmpl_rm_force32(rhs.code(), (void*)-1);
+//        AsmJSAbsoluteLink link(masm.currentOffset(), lhs.kind());
+//        enoughMemory_ &= asmJSAbsoluteLinks_.append(link);
     }
     CodeOffsetLabel cmplWithPatch(const Register &lhs, Imm32 rhs) {
      //   masm.cmpl_ir_force32(rhs.value, lhs.code());
@@ -750,7 +759,7 @@ class Assembler
         mcss.offsetFromPCToV0(sizeof(int*)*7);
         mcss.push(mRegisterID(v0.code()));//2insns
         JmpSrc src = mcss.call().m_jmp;//4insns
-        addPendingJump(src, target->raw(), Relocation::IONCODE);
+        addPendingJump(src, ImmPtr(target->raw()), Relocation::IONCODE);
     }
     
     void call(ImmWord target) {
@@ -758,15 +767,26 @@ class Assembler
     //arm : ma_call((void *) word.value);
 //    mcss.offsetFromPCToV0(sizeof(int*)*7);//2insns
 //    mcss.push(mRegisterID(v0.code()));//2insns
-        JmpSrc src = mcss.call().m_jmp;
-        addPendingJump(src, target.asPointer(), Relocation::HARDCODED);
+////        JmpSrc src = mcss.call().m_jmp;
+////        addPendingJump(src, target.asPointer(), Relocation::HARDCODED);
+        call(ImmPtr((void*)target.value));
     }
+
+    void call(ImmPtr target) {
+//        JmpSrc src = masm.call();
+//        addPendingJump(src, target, Relocation::HARDCODED);
+        JmpSrc src = mcss.call().m_jmp;
+        addPendingJump(src, target, Relocation::HARDCODED);
+    }
+
+    // New function
     void call(AsmJSImmPtr target) {
+        JS_ASSERT(0);
         // Moving to a register is suboptimal. To fix (use a single
         // call-immediate instruction) we'll need to distinguish a new type of
         // relative patch to an absolute address in AsmJSAbsoluteLink.
-        mov(target, eax);
-        call(eax);
+//        mov(target, eax);
+//        call(eax);
     }
 
     // Emit a CALL or CMP (nop) instruction. ToggleCall can be used to patch
@@ -849,7 +869,7 @@ class Assembler
     // Load from *(base + disp32) where disp32 can be patched.
     CodeOffsetLabel movsblWithPatch(Address src, Register dest) {
       //   masm.movxbl_mr_disp32(src.offset, src.base.code(), dest.code());//movxbl in x86
-        movxbl(Operand(src),dest);
+        movsbl(Operand(src),dest);
         return masm.currentOffset();
     }
     CodeOffsetLabel movzblWithPatch(Address src, Register dest) {
@@ -859,7 +879,7 @@ class Assembler
     }
     CodeOffsetLabel movswlWithPatch(Address src, Register dest) {
         //  masm.movxwl_mr_disp32(src.offset, src.base.code(), dest.code());
-        movxwl(Operand(src),dest);
+        movswl(Operand(src),dest);
         return masm.currentOffset();
     }
     CodeOffsetLabel movzwlWithPatch(Address src, Register dest) {
@@ -948,9 +968,11 @@ class Assembler
         masm.doubleConstant(d);
     */
     }
+    //New function
     void writeFloatConstant(float f, Label *label) {
-        label->bind(masm.size());
-        masm.floatConstant(f);
+        JS_ASSERT(0);
+//        label->bind(masm.size());
+//        masm.floatConstant(f);
     }
     void movl(const Imm32 &imm32, const Register &dest) {
    //     masm.movl_i32r(imm32.value, dest.code());
@@ -1022,31 +1044,39 @@ class Assembler
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
-
+    
+    // New function
     void xchgl(const Register &src, const Register &dest) {
-        masm.xchgl_rr(src.code(), dest.code());
+        JS_ASSERT(0);
+        //masm.xchgl_rr(src.code(), dest.code());
     }
 
     // Eventually movapd and movaps should be overloaded to support loads and
     // stores too.
+    // New function
     void movapd(const FloatRegister &src, const FloatRegister &dest) {
-        JS_ASSERT(HasSSE2());
-        masm.movapd_rr(src.code(), dest.code());
+        JS_ASSERT(0);
+        //JS_ASSERT(HasSSE2());
+        //masm.movapd_rr(src.code(), dest.code());
     }
     void movsd(const FloatRegister &src, const FloatRegister &dest) {
 //ok        masm.movsd_rr(src.code(), dest.code());
             mcss.moveDouble(src.code(), dest.code());
     }
+    // New function
     void movaps(const FloatRegister &src, const FloatRegister &dest) {
-        JS_ASSERT(HasSSE2());
-        masm.movaps_rr(src.code(), dest.code());
+        JS_ASSERT(0);
+//        JS_ASSERT(HasSSE2());
+//        masm.movaps_rr(src.code(), dest.code());
     }
 
     // movsd and movss are only provided in load/store form since the
     // register-to-register form has different semantics (it doesn't clobber
     // the whole output register) and isn't needed currently.
+    // New function
     void movsd(const Address &src, const FloatRegister &dest) {
-        masm.movsd_mr(src.offset, src.base.code(), dest.code());
+        JS_ASSERT(0);
+        //masm.movsd_mr(src.offset, src.base.code(), dest.code());
     }
     void movsd(const Operand &src, const FloatRegister &dest) {
         switch (src.kind()) {
@@ -1066,8 +1096,10 @@ class Assembler
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
+    // New function
     void movsd(const BaseIndex &src, const FloatRegister &dest) {
-        masm.movsd_mr(src.offset, src.base.code(), src.index.code(), src.scale, dest.code());
+        JS_ASSERT(0);
+        //masm.movsd_mr(src.offset, src.base.code(), src.index.code(), src.scale, dest.code());
     }
     void movsd(const FloatRegister &src, const Operand &dest) {
         switch (dest.kind()) {
@@ -1075,11 +1107,11 @@ class Assembler
 //ok            masm.movsd_rr(src.code(), dest.fpu());
             mcss.moveDouble(src.code(), dest.fpu());
             break;
-          case Operand::REG_DISP:
+          case Operand::MEM_REG_DISP:
 //ok            masm.movsd_rm(src.code(), dest.disp(), dest.base());
             mcss.storeDouble(src.code(), mAddress(dest.base(), dest.disp()));
             break;
-          case Operand::SCALE:
+          case Operand::MEM_SCALE:
 //ok            masm.movsd_rm(src.code(), dest.disp(), dest.base(), dest.index(), dest.scale());
             mcss.storeDouble(src.code(), mBaseIndex(dest.base(), dest.index(), mScale(dest.scale()), dest.disp()));
             break;
@@ -1087,16 +1119,18 @@ class Assembler
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
+    // New function
     void movsd(const FloatRegister &src, const Address &dest) {
-        masm.movsd_rm(src.code(), dest.offset, dest.base.code());
+        JS_ASSERT(0);
+        //masm.movsd_rm(src.code(), dest.offset, dest.base.code());
     }
     void movss(const Operand &src, const FloatRegister &dest) {
         switch (src.kind()) {
-          case Operand::REG_DISP:
+          case Operand::MEM_REG_DISP:
 //ok            masm.movss_mr(src.disp(), src.base(), dest.code());
             mcss.loadFloat(mAddress(src.base(), src.disp()), dest.code());
             break;
-          case Operand::SCALE:
+          case Operand::MEM_SCALE:
 //ok            masm.movss_mr(src.disp(), src.base(), src.index(), src.scale(), dest.code());
             mcss.loadFloat(mBaseIndex(src.base(), src.index(), mScale(src.scale()), src.disp()), dest.code());
             break;
@@ -1104,16 +1138,18 @@ class Assembler
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
+    // New function
     void movsd(const FloatRegister &src, const BaseIndex &dest) {
-        masm.movsd_rm(src.code(), dest.offset, dest.base.code(), dest.index.code(), dest.scale);
+        JS_ASSERT(0);
+        //masm.movsd_rm(src.code(), dest.offset, dest.base.code(), dest.index.code(), dest.scale);
     }
     void movss(const FloatRegister &src, const Operand &dest) {
         switch (dest.kind()) {
-          case Operand::REG_DISP:
+          case Operand::MEM_REG_DISP:
 //ok            masm.movss_rm(src.code(), dest.disp(), dest.base());
             mcss.storeFloat(src.code(), mAddress(dest.base(), dest.disp()));
             break;
-          case Operand::SCALE:
+          case Operand::MEM_SCALE:
 //ok            masm.movss_rm(src.code(), dest.disp(), dest.base(), dest.index(), dest.scale());
             mcss.storeFloat(src.code(), mBaseIndex(dest.base(), dest.index(), mScale(dest.scale()), dest.disp()));
             break;
@@ -1121,43 +1157,55 @@ class Assembler
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
+    // New function
     void movss(const Address &src, const FloatRegister &dest) {
-        masm.movss_mr(src.offset, src.base.code(), dest.code());
+        JS_ASSERT(0);
+        //masm.movss_mr(src.offset, src.base.code(), dest.code());
     }
+    // New function
     void movss(const BaseIndex &src, const FloatRegister &dest) {
-        masm.movss_mr(src.offset, src.base.code(), src.index.code(), src.scale, dest.code());
+        JS_ASSERT(0);
+        //masm.movss_mr(src.offset, src.base.code(), src.index.code(), src.scale, dest.code());
     }
+    // New function
     void movss(const FloatRegister &src, const Address &dest) {
-        masm.movss_rm(src.code(), dest.offset, dest.base.code());
+        JS_ASSERT(0);
+        //masm.movss_rm(src.code(), dest.offset, dest.base.code());
     }
+    // New function
     void movss(const FloatRegister &src, const BaseIndex &dest) {
-        masm.movss_rm(src.code(), dest.offset, dest.base.code(), dest.index.code(), dest.scale);
+        JS_ASSERT(0);
+        //masm.movss_rm(src.code(), dest.offset, dest.base.code(), dest.index.code(), dest.scale);
     }
+    // New function
     void movdqa(const Operand &src, const FloatRegister &dest) {
-        JS_ASSERT(HasSSE2());
-        switch (src.kind()) {
-          case Operand::MEM_REG_DISP:
-            masm.movdqa_mr(src.disp(), src.base(), dest.code());
-            break;
-          case Operand::MEM_SCALE:
-            masm.movdqa_mr(src.disp(), src.base(), src.index(), src.scale(), dest.code());
-            break;
-          default:
-            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
-        }
+        JS_ASSERT(0);
+//        JS_ASSERT(HasSSE2());
+//        switch (src.kind()) {
+//          case Operand::MEM_REG_DISP:
+//            masm.movdqa_mr(src.disp(), src.base(), dest.code());
+//            break;
+//          case Operand::MEM_SCALE:
+//            masm.movdqa_mr(src.disp(), src.base(), src.index(), src.scale(), dest.code());
+//            break;
+//          default:
+//            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
+//        }
     }
+    // New function
     void movdqa(const FloatRegister &src, const Operand &dest) {
-        JS_ASSERT(HasSSE2());
-        switch (dest.kind()) {
-          case Operand::MEM_REG_DISP:
-            masm.movdqa_rm(src.code(), dest.disp(), dest.base());
-            break;
-          case Operand::MEM_SCALE:
-            masm.movdqa_rm(src.code(), dest.disp(), dest.base(), dest.index(), dest.scale());
-            break;
-          default:
-            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
-        }
+        JS_ASSERT(0);
+//        JS_ASSERT(HasSSE2());
+//        switch (dest.kind()) {
+//          case Operand::MEM_REG_DISP:
+//            masm.movdqa_rm(src.code(), dest.disp(), dest.base());
+//            break;
+//          case Operand::MEM_SCALE:
+//            masm.movdqa_rm(src.code(), dest.disp(), dest.base(), dest.index(), dest.scale());
+//            break;
+//          default:
+//            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
+//        }
     }
      void cvtss2sd(const FloatRegister &src, const FloatRegister &dest) {
 //ok        masm.cvtss2sd_rr(src.code(), dest.code());
@@ -1324,18 +1372,19 @@ class Assembler
     }
 
     // Comparison of EAX against the address given by a Label.
-    JmpSrc cmpSrc(Label *label) {
-        JmpSrc j = masm.cmp_eax();
-        if (label->bound()) {
-            // The jump can be immediately patched to the correct destination.
-            masm.linkJump(j, JmpDst(label->offset()));
-        } else {
-            // Thread the jump list through the unpatched jump targets.
-            JmpSrc prev = JmpSrc(label->use(j.offset()));
-            masm.setNextJump(j, prev);
-        }
-        return j;
-    }
+    // no use
+    // JmpSrc cmpSrc(Label *label) {
+//        JmpSrc j = masm.cmp_eax();
+//        if (label->bound()) {
+//            // The jump can be immediately patched to the correct destination.
+//            masm.linkJump(j, JmpDst(label->offset()));
+//        } else {
+//            // Thread the jump list through the unpatched jump targets.
+//            JmpSrc prev = JmpSrc(label->use(j.offset()));
+//            masm.setNextJump(j, prev);
+//        }
+//        return j;
+//    }
 
     JmpSrc jSrc(Condition cond, RepatchLabel *label) {
      //   JmpSrc j = masm.jCC(static_cast<JSC::X86Assembler::Condition>(cond));
@@ -1373,7 +1422,9 @@ class Assembler
    void jmp(const Operand &op){
         switch (op.kind()) {
           case Operand::MEM_REG_DISP:
-            masm.jmp_m(op.disp(), op.base());
+            // New branch,
+            JS_ASSERT(0);
+            //masm.jmp_m(op.disp(), op.base());
             break;
           case Operand::MEM_SCALE:
 //ok            masm.jmp_m(op.disp(), op.base(), op.index(), op.scale());
@@ -1391,27 +1442,25 @@ class Assembler
  //   void cmpEAX(Label *label) { cmpSrc(label); }
     void bind(Label *label) {
         JSC::MacroAssembler::Label jsclabel;
-        JSC::X86Assembler::JmpDst dst(masm.label());
         if (label->used()) {
             bool more;
             JSC::MIPSAssembler::JmpSrc jmp(label->offset());
             do {
                 JSC::MIPSAssembler::JmpSrc next;
                 more = masm.nextJump(jmp, &next);
-                masm.linkJump(jmp, dst);
+                masm.linkJump(jmp, masm.label());
                 jmp = next;
             } while (more);
         }
-        label->bind(dst.offset());
+        label->bind(masm.label().offset());
     }
     void bind(RepatchLabel *label) {
         JSC::MacroAssembler::Label jsclabel;
-        JSC::X86Assembler::JmpDst dst(masm.label());
         if (label->used()) {
             JSC::MIPSAssembler::JmpSrc jmp(label->offset());
-            masm.linkJump(jmp, dst);
+            masm.linkJump(jmp, masm.label());
         }
-        label->bind(dst.offset());
+        label->bind(masm.label().offset());
     }
     uint32_t currentOffset() {
         return masm.label().offset();
@@ -1486,24 +1535,23 @@ class Assembler
     //    masm.int3();
       mcss.breakpoint();
     }
-    //maybe useless
+    // New function, maybe useless
     static bool HasSSE2() {
-        return JSC::MacroAssembler::getSSEState() >= JSC::MacroAssembler::HasSSE2;
+        JS_ASSERT(0);
+        //return JSC::MacroAssembler::getSSEState() >= JSC::MacroAssembler::HasSSE2;
     }
     static bool HasSSE3() {
-        return JSC::MacroAssembler::getSSEState() >= JSC::MacroAssembler::HasSSE3;
+        JS_ASSERT(0);
+        //return JSC::MacroAssembler::getSSEState() >= JSC::MacroAssembler::HasSSE3;
     }
     static bool HasSSE41() {
-        return JSC::MacroAssembler::getSSEState() >= JSC::MacroAssembler::HasSSE4_1;
+        JS_ASSERT(0);
+        //return JSC::MacroAssembler::getSSEState() >= JSC::MacroAssembler::HasSSE4_1;
     }
 
     // The below cmpl methods switch the lhs and rhs when it invokes the
     // macroassembler to conform with intel standard.  When calling this
     // function put the left operand on the left as you would expect.
-    void cmpl(const Register &lhs, const Register &rhs) {
-        movl(lhs,cmpTempRegister);
-        movl(rhs,cmpTemp2Register);
-    }
     void cmpl(const Register &lhs, const Operand &rhs) {
         movl(lhs,cmpTempRegister);
         movl(rhs,cmpTemp2Register);
@@ -1569,7 +1617,7 @@ class Assembler
 //ok            masm.addl_im(imm.value, op.disp(), op.base());
             mcss.add32(mTrustedImm32(imm.value), mAddress(op.base(), op.disp()));
             break;
-          case Operand::MEM_ADDRESS:
+          case Operand::MEM_ADDRESS32:
 //ok            masm.addl_im(imm.value, op.address());
             mcss.load32(op.address(), dataTempRegister.code());
             mcss.add32(mTrustedImm32(imm.value), dataTempRegister.code());
@@ -1823,13 +1871,15 @@ class Assembler
   //      masm.sarl_CLr(dest.code());
       mcss.rshift32(mRegisterID(v0.code()), dest.code());
     }
+    // New function
     void xaddl(const Register &srcdest, const Operand &mem) {
+        JS_ASSERT(0);
         switch (mem.kind()) {
           case Operand::MEM_REG_DISP:
-            masm.xaddl_rm(srcdest.code(), mem.disp(), mem.base());
+            //masm.xaddl_rm(srcdest.code(), mem.disp(), mem.base());
             break;
           case Operand::MEM_SCALE:
-            masm.xaddl_rm(srcdest.code(), mem.disp(), mem.base(), mem.index(), mem.scale());
+            //masm.xaddl_rm(srcdest.code(), mem.disp(), mem.base(), mem.index(), mem.scale());
             break;
           default:
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
@@ -1905,18 +1955,21 @@ class Assembler
         pop(cmpTempRegister);
     }
 
+    // New function
 #ifdef JS_CPU_X86
     void pushAllRegs() {
-        masm.pusha();
+        //masm.pusha();
     }
     void popAllRegs() {
-        masm.popa();
+        //masm.popa();
     }
 #endif
 
     // Zero-extend byte to 32-bit integer.
+    // New function
     void movzbl(const Register &src, const Register &dest) {
-        masm.movzbl_rr(src.code(), dest.code());
+        //masm.movzbl_rr(src.code(), dest.code());
+    	mcss.zeroExtend32ToPtr(src.code(),dest.code());//mipsÖÐ²¢Ã»ÓÐÊµÏÖÀ©Õ¹£¡
     }
 
     void movzxbl(const Register &src, const Register &dest)
@@ -1954,25 +2007,28 @@ class Assembler
   //      JS_ASSERT(HasSSE2());
    //     masm.pinsrd_rr(src.code(), dest.code());
     }
+    // New function
     void pinsrd(const Operand &src, const FloatRegister &dest) {
-    	ASSERT(0);
-        JS_ASSERT(HasSSE2());
+    	JS_ASSERT(0);
+        //JS_ASSERT(HasSSE2());
         switch (src.kind()) {
           case Operand::REG:
-            masm.pinsrd_rr(src.reg(), dest.code());
+            //masm.pinsrd_rr(src.reg(), dest.code());
             break;
           case Operand::MEM_REG_DISP:
-            masm.pinsrd_mr(src.disp(), src.base(), dest.code());
+            //masm.pinsrd_mr(src.disp(), src.base(), dest.code());
             break;
           default:
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
+    // New function
     void psrldq(Imm32 shift, const FloatRegister &dest) {
       ASSERT(0);
       /*  JS_ASSERT(HasSSE2());
         masm.psrldq_ir(shift.value, dest.code());*/
     }
+    // New function
     void psllq(Imm32 shift, const FloatRegister &dest) {
     ASSERT(0);
     /*    JS_ASSERT(HasSSE2());
@@ -2006,29 +2062,35 @@ class Assembler
 //ok        masm.cvttsd2si_rr(src.code(), dest.code());
         mcss.truncateDoubleToInt32(src.code(), dest.code());
     }
+    // New function
     void cvttss2si(const FloatRegister &src, const Register &dest) {
-        JS_ASSERT(HasSSE2());
-        masm.cvttss2si_rr(src.code(), dest.code());
+        JS_ASSERT(0);
+//        JS_ASSERT(HasSSE2());
+//        masm.cvttss2si_rr(src.code(), dest.code());
     }
+    // New function
     void cvtsi2ss(const Operand &src, const FloatRegister &dest) {
+        JS_ASSERT(0);
         JS_ASSERT(HasSSE2());
         switch (src.kind()) {
           case Operand::REG:
-            masm.cvtsi2ss_rr(src.reg(), dest.code());
+            //masm.cvtsi2ss_rr(src.reg(), dest.code());
             break;
           case Operand::MEM_REG_DISP:
-            masm.cvtsi2ss_mr(src.disp(), src.base(), dest.code());
+            //masm.cvtsi2ss_mr(src.disp(), src.base(), dest.code());
             break;
           case Operand::MEM_SCALE:
-            masm.cvtsi2ss_mr(src.disp(), src.base(), src.index(), src.scale(), dest.code());
+            //masm.cvtsi2ss_mr(src.disp(), src.base(), src.index(), src.scale(), dest.code());
             break;
           default:
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
+    // New function
     void cvtsi2ss(const Register &src, const FloatRegister &dest) {
-        JS_ASSERT(HasSSE2());
-        masm.cvtsi2ss_rr(src.code(), dest.code());
+        JS_ASSERT(0);
+        //JS_ASSERT(HasSSE2());
+        //masm.cvtsi2ss_rr(src.code(), dest.code());
     }
     void cvtsi2sd(const Register &src, const FloatRegister &dest) {
 //ok        masm.cvtsi2sd_rr(src.code(), dest.code());
@@ -2040,9 +2102,11 @@ class Assembler
         masm.dmfc1(mRegisterID(src.code()), mFPRegisterID(dest.code()));
     masm.dsrl32(mRegisterID(dest.code()), mRegisterID(dest.code()), 31);
     }
+    // New function
     void movmskps(const FloatRegister &src, const Register &dest) {
-        JS_ASSERT(HasSSE2());
-        masm.movmskps_rr(src.code(), dest.code());
+        JS_ASSERT(0);
+//        JS_ASSERT(HasSSE2());
+//        masm.movmskps_rr(src.code(), dest.code());
     }
    void ptest(const FloatRegister &lhs, const FloatRegister &rhs) {
   ASSERT(0);
@@ -2055,9 +2119,11 @@ class Assembler
      mcss.moveDouble(lhs.code(), fpTempRegister.code());
      mcss.moveDouble(rhs.code(), fpTemp2Register.code());
     }
+    // New function
     void ucomiss(const FloatRegister &lhs, const FloatRegister &rhs) {
-        JS_ASSERT(HasSSE2());
-        masm.ucomiss_rr(rhs.code(), lhs.code());
+        JS_ASSERT(0);
+//        JS_ASSERT(HasSSE2());
+//        masm.ucomiss_rr(rhs.code(), lhs.code());
     }
     void pcmpeqw(const FloatRegister &lhs, const FloatRegister &rhs) {
    ASSERT(0);
@@ -2076,9 +2142,11 @@ class Assembler
 //ok        masm.addsd_rr(src.code(), dest.code());
         mcss.addDouble(src.code(), dest.code());
     }
+    // New function
     void addss(const FloatRegister &src, const FloatRegister &dest) {
-        JS_ASSERT(HasSSE2());
-        masm.addss_rr(src.code(), dest.code());
+        JS_ASSERT(0);
+//        JS_ASSERT(HasSSE2());
+//        masm.addss_rr(src.code(), dest.code());
     }
     void addsd(const Operand &src, const FloatRegister &dest) {
         switch (src.kind()) {
@@ -2098,17 +2166,19 @@ class Assembler
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
+    // New function
     void addss(const Operand &src, const FloatRegister &dest) {
+        JS_ASSERT(0);
         JS_ASSERT(HasSSE2());
         switch (src.kind()) {
           case Operand::FPREG:
-            masm.addss_rr(src.fpu(), dest.code());
+            //masm.addss_rr(src.fpu(), dest.code());
             break;
           case Operand::MEM_REG_DISP:
-            masm.addss_mr(src.disp(), src.base(), dest.code());
+            //masm.addss_mr(src.disp(), src.base(), dest.code());
             break;
           case Operand::MEM_ADDRESS32:
-            masm.addss_mr(src.address(), dest.code());
+            //masm.addss_mr(src.address(), dest.code());
             break;
           default:
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
@@ -2118,12 +2188,14 @@ class Assembler
 //ok        masm.subsd_rr(src.code(), dest.code());
         mcss.subDouble(src.code(), dest.code());
     }
+    // New function
     void subss(const FloatRegister &src, const FloatRegister &dest) {
-        JS_ASSERT(HasSSE2());
-        masm.subss_rr(src.code(), dest.code());
+        JS_ASSERT(0);
+        //JS_ASSERT(HasSSE2());
+        //masm.subss_rr(src.code(), dest.code());
     }
     void subsd(const Operand &src, const FloatRegister &dest) {
-        JS_ASSERT(HasSSE2());
+        //JS_ASSERT(HasSSE2());
         switch (src.kind()) {
           case Operand::FPREG:
 //ok            masm.subsd_rr(src.fpu(), dest.code());
@@ -2137,14 +2209,16 @@ class Assembler
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
+    // New function
     void subss(const Operand &src, const FloatRegister &dest) {
+        JS_ASSERT(0);
         JS_ASSERT(HasSSE2());
         switch (src.kind()) {
           case Operand::FPREG:
-            masm.subss_rr(src.fpu(), dest.code());
+            //masm.subss_rr(src.fpu(), dest.code());
             break;
           case Operand::MEM_REG_DISP:
-            masm.subss_mr(src.disp(), src.base(), dest.code());
+            //masm.subss_mr(src.disp(), src.base(), dest.code());
             break;
           default:
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
@@ -2168,30 +2242,36 @@ class Assembler
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
+    // New function
     void mulss(const Operand &src, const FloatRegister &dest) {
+        JS_ASSERT(0);
         JS_ASSERT(HasSSE2());
         switch (src.kind()) {
           case Operand::FPREG:
-            masm.mulss_rr(src.fpu(), dest.code());
+            //masm.mulss_rr(src.fpu(), dest.code());
             break;
           case Operand::MEM_REG_DISP:
-            masm.mulss_mr(src.disp(), src.base(), dest.code());
+            //masm.mulss_mr(src.disp(), src.base(), dest.code());
             break;
           default:
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
+    // New function
     void mulss(const FloatRegister &src, const FloatRegister &dest) {
+        JS_ASSERT(0);
         JS_ASSERT(HasSSE2());
-        masm.mulss_rr(src.code(), dest.code());
+        //masm.mulss_rr(src.code(), dest.code());
     }
     void divsd(const FloatRegister &src, const FloatRegister &dest) {
 //ok        masm.divsd_rr(src.code(), dest.code());
         mcss.divDouble(src.code(), dest.code());
     }
+    // New function
     void divss(const FloatRegister &src, const FloatRegister &dest) {
+        JS_ASSERT(0);
         JS_ASSERT(HasSSE2());
-        masm.divss_rr(src.code(), dest.code());
+        //masm.divss_rr(src.code(), dest.code());
     }
     void divsd(const Operand &src, const FloatRegister &dest) {
         switch (src.kind()) {
@@ -2207,14 +2287,16 @@ class Assembler
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
+    // New function
     void divss(const Operand &src, const FloatRegister &dest) {
+        JS_ASSERT(0);
         JS_ASSERT(HasSSE2());
         switch (src.kind()) {
           case Operand::FPREG:
-            masm.divss_rr(src.fpu(), dest.code());
+            //masm.divss_rr(src.fpu(), dest.code());
             break;
           case Operand::MEM_REG_DISP:
-            masm.divss_mr(src.disp(), src.base(), dest.code());
+            //masm.divss_mr(src.disp(), src.base(), dest.code());
             break;
           default:
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
@@ -2230,6 +2312,13 @@ class Assembler
         ASSERT(src.code() == dest.code());
         zerod(src);
     }
+    // New function
+    void xorps(const FloatRegister &src, const FloatRegister &dest) {
+        //JS_ASSERT(HasSSE2());
+        //masm.xorps_rr(src.code(), dest.code());
+        ASSERT(src.code() == dest.code());
+        zerod(src);
+    }
     void orpd(const FloatRegister &src, const FloatRegister &dest) {
         ASSERT(0);
     /*    JS_ASSERT(HasSSE2());
@@ -2240,101 +2329,111 @@ class Assembler
   /*      JS_ASSERT(HasSSE2());
         masm.andpd_rr(src.code(), dest.code());*/
     }
+    // New function
     void andps(const FloatRegister &src, const FloatRegister &dest) {
-        JS_ASSERT(HasSSE2());
-        masm.andps_rr(src.code(), dest.code());
+        JS_ASSERT(0);
+        //JS_ASSERT(HasSSE2());
+        //masm.andps_rr(src.code(), dest.code());
     }
     void sqrtsd(const FloatRegister &src, const FloatRegister &dest) {
        // JS_ASSERT(HasSSE2());
       //  masm.sqrtsd_rr(src.code(), dest.code());
         mcss.sqrtDouble(src.code(), dest.code());
     }
+    // New function
     void sqrtss(const FloatRegister &src, const FloatRegister &dest) {
-        JS_ASSERT(HasSSE2());
-        masm.sqrtss_rr(src.code(), dest.code());
+        JS_ASSERT(0);
+    //    JS_ASSERT(HasSSE2());
+    //    masm.sqrtss_rr(src.code(), dest.code());
     }
-    void roundsd(const FloatRegister &src, const FloatRegister &dest,
-                 JSC::X86Assembler::RoundingMode mode)
+    // New function
+    void roundsd(const FloatRegister &src, const FloatRegister &dest)
+                 //JSC::X86Assembler::RoundingMode mode)
     {
+        JS_ASSERT(0);
     //    JS_ASSERT(HasSSE41());
     //    masm.roundsd_rr(src.code(), dest.code(), mode);
      mcss.floorDouble(src.code(), dest.code());
     }
-    void roundss(const FloatRegister &src, const FloatRegister &dest,
-                 JSC::X86Assembler::RoundingMode mode)
+    // New function
+    void roundss(const FloatRegister &src, const FloatRegister &dest)
+                 //JSC::X86Assembler::RoundingMode mode)
     {
-        JS_ASSERT(HasSSE41());
-        masm.roundss_rr(src.code(), dest.code(), mode);
+        JS_ASSERT(0);
+//        JS_ASSERT(HasSSE41());
+//        masm.roundss_rr(src.code(), dest.code(), mode);
     }
+    // New function
     void minsd(const FloatRegister &src, const FloatRegister &dest) {
-        JS_ASSERT(HasSSE2());
-        masm.minsd_rr(src.code(), dest.code());
+        JS_ASSERT(0);
+        //JS_ASSERT(HasSSE2());
+        //masm.minsd_rr(src.code(), dest.code());
     }
+    // New function
     void minsd(const Operand &src, const FloatRegister &dest) {
-        JS_ASSERT(HasSSE2());
-        switch (src.kind()) {
-          case Operand::FPREG:
-            masm.minsd_rr(src.fpu(), dest.code());
-            break;
-          case Operand::MEM_REG_DISP:
-            masm.minsd_mr(src.disp(), src.base(), dest.code());
-            break;
-          default:
-            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
-        }
+        JS_ASSERT(0);
+        //JS_ASSERT(HasSSE2());
+        //switch (src.kind()) {
+        //  case Operand::FPREG:
+        //    masm.minsd_rr(src.fpu(), dest.code());
+        //    break;
+        //  case Operand::MEM_REG_DISP:
+        //    masm.minsd_mr(src.disp(), src.base(), dest.code());
+        //    break;
+        //  default:
+        //    MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
+        //}
     }
+    // New function
     void maxsd(const FloatRegister &src, const FloatRegister &dest) {
-        JS_ASSERT(HasSSE2());
-        masm.maxsd_rr(src.code(), dest.code());
+        JS_ASSERT(0);
+        //JS_ASSERT(HasSSE2());
+        //masm.maxsd_rr(src.code(), dest.code());
     }
+    // New function
     void maxsd(const Operand &src, const FloatRegister &dest) {
-        JS_ASSERT(HasSSE2());
-        switch (src.kind()) {
-          case Operand::FPREG:
-            masm.maxsd_rr(src.fpu(), dest.code());
-            break;
-          case Operand::MEM_REG_DISP:
-            masm.maxsd_mr(src.disp(), src.base(), dest.code());
-            break;
-          default:
-            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
-        }
+        JS_ASSERT(0);
+        //JS_ASSERT(HasSSE2());
+        //switch (src.kind()) {
+        //  case Operand::FPREG:
+        //    masm.maxsd_rr(src.fpu(), dest.code());
+        //    break;
+        //  case Operand::MEM_REG_DISP:
+        //    masm.maxsd_mr(src.disp(), src.base(), dest.code());
+        //    break;
+        //  default:
+        //    MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
+        //}
     }
+    // New function
     void fisttp(const Operand &dest) {
-    	    ASSERT(0);
-        JS_ASSERT(HasSSE3());
-        switch (dest.kind()) {
-          case Operand::MEM_REG_DISP:
-            masm.fisttp_m(dest.disp(), dest.base());
-            break;
-          default:
-            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
-        }
+        ASSERT(0);
+        //JS_ASSERT(HasSSE3());
+        //switch (dest.kind()) {
+        //  case Operand::MEM_REG_DISP:
+        //    //masm.fisttp_m(dest.disp(), dest.base());
+        //    break;
+        //  default:
+        //    MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
+        //}
     }
+    // New function
     void fld(const Operand &dest) {
-    	    ASSERT(0);
+        ASSERT(0);
         switch (dest.kind()) {
           case Operand::MEM_REG_DISP:
-            masm.fld_m(dest.disp(), dest.base());
+            //masm.fld_m(dest.disp(), dest.base());
             break;
           default:
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
+    // New function
     void fstp(const Operand &src) {
         ASSERT(0);
         switch (src.kind()) {
           case Operand::MEM_REG_DISP:
-            masm.fstp_m(src.disp(), src.base());
-            break;
-          default:
-            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
-        }
-    }
-    void fstp32(const Operand &src) {
-        switch (src.kind()) {
-          case Operand::MEM_REG_DISP:
-            masm.fstp32_m(src.disp(), src.base());
+            //masm.fstp_m(src.disp(), src.base());
             break;
           default:
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
@@ -2371,19 +2470,19 @@ class Assembler
 
     static void patchWrite_Imm32(CodeLocationLabel dataLabel, Imm32 toWrite) {
      //   *((int32_t *) dataLabel.raw() - 1) = toWrite.value;
-         JSC::MIPSAssembler::setInt32((int32 *) dataLabel.raw(), toWrite.value);
+         JSC::MIPSAssembler::setInt32((int32_t *) dataLabel.raw(), toWrite.value);
     }
 
-    static void patchDataWithValueCheck(CodeLocationLabel data, ImmWord newData,
-                                        ImmWord expectedData)  {
+    static void patchDataWithValueCheck(CodeLocationLabel data, PatchedImmPtr newData,
+                                        PatchedImmPtr expectedData) {
 //TBDok
         // The pointer given is a pointer to *after* the data.
 //        uintptr_t *ptr = ((uintptr_t *) data.raw()) - 1;
 //        JS_ASSERT(*ptr == expectedData.value);
 //        *ptr = newData.value;
         uint32_t old = JSC::MIPSAssembler::getInt32(data.raw());
-        JS_ASSERT(old == expectedData.value);
-        JSC::MIPSAssembler::setInt32(((uint8_t *)data.raw()), (newData.value));
+        JS_ASSERT(old == (uint32_t)expectedData.value);
+        JSC::MIPSAssembler::setInt32(((uint8_t *)data.raw()), *(int32_t *)(newData.value));
     }
     static void patchDataWithValueCheck(CodeLocationLabel data, ImmPtr newData, ImmPtr expectedData) {
         patchDataWithValueCheck(data, PatchedImmPtr(newData.value), PatchedImmPtr(expectedData.value));

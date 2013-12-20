@@ -76,6 +76,7 @@ public:
         LessThanOrEqual,
         Overflow,
         Signed,
+		NotSigned,
         Zero,
         NonZero
     };

@@ -12,11 +12,11 @@
 namespace js {
 namespace jit {
 
-class LIRGeneratorMIPS : public LIRGeneratorMIPSShared
+class LIRGeneratorMIPS : public LIRGeneratorShared
 {
   public:
     LIRGeneratorMIPS(MIRGenerator *gen, MIRGraph &graph, LIRGraph &lirGraph)
-      : LIRGeneratorMIPSShared(gen, graph, lirGraph)
+      : LIRGeneratorShared(gen, graph, lirGraph)
     { }
 
   protected:
