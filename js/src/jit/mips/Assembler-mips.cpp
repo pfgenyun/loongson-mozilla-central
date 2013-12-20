@@ -9,12 +9,15 @@
 #include "jscompartment.h"
 #include "jit/IonCompartment.h"
 
-#include "jit/mips/Assembler-mips.h"
+#include "gc/Marking.h"
+#include "jit/JitCompartment.h"
+#include "jit/mips/MacroAssembler-mips.h"
+
+
+#include "Assembler-mips.h"
 #include "gc/Marking.h"
 using namespace js;
 using namespace js::jit;
-
-// from jit/x86/Assembler-x86.cpp
 
 ABIArgGenerator::ABIArgGenerator()
   : stackOffset_(0),
@@ -43,83 +46,8 @@ ABIArgGenerator::next(MIRType type)
 const Register ABIArgGenerator::NonArgReturnVolatileReg0 = s4;//ecx;
 const Register ABIArgGenerator::NonArgReturnVolatileReg1 = s6;//edx;
 const Register ABIArgGenerator::NonVolatileReg =s3;// ebx;
-
-void
-Assembler::executableCopy(uint8_t *buffer)
-{
-    masm.executableCopy(buffer);
-
-    for (size_t i = 0; i < jumps_.length(); i++) {
-        RelativePatch &rp = jumps_[i];
-//ok        JSC::X86Assembler::setRel32(buffer + rp.offset, rp.target);
-        mcss.repatchJump(JSC::CodeLocationJump(buffer + rp.offset), JSC::CodeLocationLabel(rp.target));
-    }
-}
-
-class RelocationIterator
-{
-    CompactBufferReader reader_;
-    uint32_t offset_;
-
-  public:
-    RelocationIterator(CompactBufferReader &reader)
-      : reader_(reader)
-    { }
-
-    bool read() {
-        if (!reader_.more())
-            return false;
-        offset_ = reader_.readUnsigned();
-        return true;
-    }
-
-    uint32_t offset() const {
-        return offset_;
-    }
-};
-
-static inline IonCode *
-CodeFromJump(uint8_t *jump)
-{
-    uint8_t *target = (uint8_t *)JSC::MIPSAssembler::getRel32Target(jump);
-    return IonCode::FromExecutable(target);
-}
-
-void
-Assembler::TraceJumpRelocations(JSTracer *trc, IonCode *code, CompactBufferReader &reader)
-{
-    RelocationIterator iter(reader);
-    while (iter.read()) {
-        IonCode *child = CodeFromJump(code->raw() + iter.offset());
-        MarkIonCodeUnbarriered(trc, &child, "rel32");
-        JS_ASSERT(child == CodeFromJump(code->raw() + iter.offset()));
-    }
-}
-
-
-//from jit/shared/Assembler-x86-shared.cpp
-
-void
-Assembler::copyJumpRelocationTable(uint8_t *dest)
-{
-    if (jumpRelocations_.length())
-        memcpy(dest, jumpRelocations_.buffer(), jumpRelocations_.length());
-}
-
-void
-Assembler::copyDataRelocationTable(uint8_t *dest)
-{
-    if (dataRelocations_.length())
-        memcpy(dest, dataRelocations_.buffer(), dataRelocations_.length());
-}
-
-void
-Assembler::copyPreBarrierTable(uint8_t *dest)
-{
-    if (preBarriers_.length())
-        memcpy(dest, preBarriers_.buffer(), preBarriers_.length());
-}
-
+	
+	
 static void
 TraceDataRelocations(JSTracer *trc, uint8_t *buffer, CompactBufferReader &reader)
 {
@@ -146,48 +74,24 @@ TraceDataRelocations(JSTracer *trc, uint8_t *buffer, CompactBufferReader &reader
     }
 }	
 
+
 void
 Assembler::TraceDataRelocations(JSTracer *trc, IonCode *code, CompactBufferReader &reader)
 {
     ::TraceDataRelocations(trc, code->raw(), reader);
 }
-
 void
-Assembler::trace(JSTracer *trc)
-{
-    for (size_t i = 0; i < jumps_.length(); i++) {
-        RelativePatch &rp = jumps_[i];
-        if (rp.kind == Relocation::IONCODE) {
-            IonCode *code = IonCode::FromExecutable((uint8_t *)rp.target);
-            MarkIonCodeUnbarriered(trc, &code, "masmrel32");
-            JS_ASSERT(code == IonCode::FromExecutable((uint8_t *)rp.target));
-        }
-    }
-    if (dataRelocations_.length()) {
-        CompactBufferReader reader(dataRelocations_);
-       // ::(trc, masm.buffer(), reader);
-        ::TraceDataRelocations(trc, masm.buffer(), reader);
-    }
+Assembler::absd(const FloatRegister &src) {
+    mcss.absDouble(mFPRegisterID(src.code()), mFPRegisterID(src.code()));
 }
-
-// executeableCopy is new added from jit/shared/Assembler-x86-shared.cpp
 void
-Assembler::executableCopy(void *buffer)
-{
-    masm.executableCopy(buffer);
+Assembler::zerod(const FloatRegister &src) {
+    mcss.zeroDouble(mFPRegisterID(src.code()));
 }
-
 void
-Assembler::processCodeLabels(uint8_t *rawCode)
-{
-    for (size_t i = 0; i < codeLabels_.length(); i++) {
-     //   CodeLabel *label = codeLabels_[i];
-     //   Bind(code, label->dest(), code->raw() + label->src()->offset());
-        CodeLabel label = codeLabels_[i];
-        Bind(rawCode, label.dest(), rawCode + label.src()->offset());
-    }
+Assembler::negd(const FloatRegister &src, const FloatRegister &dest) {
+    mcss.negDouble(mFPRegisterID(src.code()), mFPRegisterID(dest.code()));
 }
-
 Assembler::Condition
 Assembler::InvertCondition(Condition cond)
 {
@@ -213,46 +117,105 @@ Assembler::InvertCondition(Condition cond)
       case BelowOrEqual:
         return Above;
       default:
-        JS_NOT_REACHED("unexpected condition");
-        return Equal;
+        MOZ_ASSUME_UNREACHABLE("unexpected condition");
+    }
+}
+void
+Assembler::trace(JSTracer *trc)
+{
+    for (size_t i = 0; i < jumps_.length(); i++) {
+        RelativePatch &rp = jumps_[i];
+        if (rp.kind == Relocation::IONCODE) {
+            IonCode *code = IonCode::FromExecutable((uint8_t *)rp.target);
+            MarkIonCodeUnbarriered(trc, &code, "masmrel32");
+            JS_ASSERT(code == IonCode::FromExecutable((uint8_t *)rp.target));
+        }
+    }
+    if (dataRelocations_.length()) {
+        CompactBufferReader reader(dataRelocations_);
+       // ::(trc, masm.buffer(), reader);
+        ::TraceDataRelocations(trc, masm.buffer(), reader);
+    }
+}
+void
+Assembler::processCodeLabels(uint8_t *rawCode)
+{
+    for (size_t i = 0; i < codeLabels_.length(); i++) {
+     //   CodeLabel *label = codeLabels_[i];
+     //   Bind(code, label->dest(), code->raw() + label->src()->offset());
+        CodeLabel label = codeLabels_[i];
+        Bind(rawCode, label.dest(), rawCode + label.src()->offset());
     }
 }
 
 void
-AutoFlushCache::update(uintptr_t newStart, size_t len)
+Assembler::copyJumpRelocationTable(uint8_t *dest)
 {
+    if (jumpRelocations_.length())
+        memcpy(dest, jumpRelocations_.buffer(), jumpRelocations_.length());
 }
 
 void
-AutoFlushCache::flushAnyway()
+Assembler::copyDataRelocationTable(uint8_t *dest)
 {
+    if (dataRelocations_.length())
+        memcpy(dest, dataRelocations_.buffer(), dataRelocations_.length());
 }
 
-AutoFlushCache::~AutoFlushCache()
+void
+Assembler::copyPreBarrierTable(uint8_t *dest)
 {
-    if (!runtime_)
-        return;
-
-    if (runtime_->flusher() == this)
-        runtime_->setFlusher(NULL);
+    if (preBarriers_.length())
+        memcpy(dest, preBarriers_.buffer(), preBarriers_.length());
 }
+class RelocationIterator
+{
+    CompactBufferReader reader_;
+    uint32_t offset_;
 
+  public:
+    RelocationIterator(CompactBufferReader &reader)
+      : reader_(reader)
+    { }
 
-// The following is from jit/mips/Assembler-mips.h
+    bool read() {
+        if (!reader_.more())
+            return false;
+        offset_ = reader_.readUnsigned();
+        return true;
+    }
 
+    uint32_t offset() const {
+        return offset_;
+    }
+};
+static inline IonCode *
+CodeFromJump(uint8_t *jump)
+{
+    uint8_t *target = (uint8_t *)JSC::MIPSAssembler::getRel32Target(jump);
+    return IonCode::FromExecutable(target);
+}
 void
-Assembler::absd(const FloatRegister &src) {
-    mcss.absDouble(mFPRegisterID(src.code()), mFPRegisterID(src.code()));
+Assembler::TraceJumpRelocations(JSTracer *trc, IonCode *code, CompactBufferReader &reader)
+{
+    RelocationIterator iter(reader);
+    while (iter.read()) {
+        IonCode *child = CodeFromJump(code->raw() + iter.offset());
+        MarkIonCodeUnbarriered(trc, &child, "rel32");
+        JS_ASSERT(child == CodeFromJump(code->raw() + iter.offset()));
+    }
 }
 void
-Assembler::zerod(const FloatRegister &src) {
-    mcss.zeroDouble(mFPRegisterID(src.code()));
-}
-void
-Assembler::negd(const FloatRegister &src, const FloatRegister &dest) {
-    mcss.negDouble(mFPRegisterID(src.code()), mFPRegisterID(dest.code()));
-}
+Assembler::executableCopy(uint8_t *buffer)
+{
+    masm.executableCopy(buffer);
 
+    for (size_t i = 0; i < jumps_.length(); i++) {
+        RelativePatch &rp = jumps_[i];
+//ok        JSC::X86Assembler::setRel32(buffer + rp.offset, rp.target);
+        mcss.repatchJump(JSC::CodeLocationJump(buffer + rp.offset), JSC::CodeLocationLabel(rp.target));
+    }
+}
 void
 Assembler::retn(Imm32 n) {
     // Remove the size of the return address which is included in the frame.
@@ -395,4 +358,22 @@ Assembler::patchWrite_NearCall(CodeLocationLabel startLabel, CodeLocationLabel t
     *(start + 5) = 0x27bdfffc;
     *(start + 6) = 0xafa20000;
     *(start + 7) = 0x0c000000 | (((reinterpret_cast<intptr_t>(to)) >> 2) & 0x3ffffff);
+}
+void
+AutoFlushCache::update(uintptr_t newStart, size_t len)
+{
+}
+
+void
+AutoFlushCache::flushAnyway()
+{
+}
+
+AutoFlushCache::~AutoFlushCache()
+{
+    if (!runtime_)
+        return;
+
+    if (runtime_->flusher() == this)
+        runtime_->setFlusher(nullptr);
 }

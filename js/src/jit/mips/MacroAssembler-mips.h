@@ -805,12 +805,12 @@ class MacroAssemblerMIPS : public Assembler
     void unboxDouble(const Operand &payload, const Operand &type,
                      const Register &scratch, const FloatRegister &dest) {
         JS_ASSERT(dest != ScratchFloatReg);
-        if (Assembler::HasSSE41()) {
+        /*if (Assembler::HasSSE41()) {
             movl(payload, scratch);
             movd(scratch, dest);
             movl(type, scratch);
             pinsrd(scratch, dest);
-        } else {
+        } else */{
             movl(payload, scratch);
             movd(scratch, dest);
             movl(type, scratch);
@@ -1542,17 +1542,17 @@ class MacroAssemblerMIPS : public Assembler
             testl(dest, dest);
             j(Assembler::NonZero, &notZero);
 
-            if (Assembler::HasSSE41()) {
-                ptest(src, src);
-                j(Assembler::NonZero, fail);
-            } else {
+//            if (Assembler::HasSSE41()) {
+//                ptest(src, src);
+//                j(Assembler::NonZero, fail);
+//            } else {
                 // bit 0 = sign of low double
                 // bit 1 = sign of high double
                 movmskpd(src, dest);
                 andl(Imm32(1), dest);
                 cmpl(zero,dest);
                 j(Assembler::NonZero, fail);
-            }
+//            }
 
             bind(&notZero);
         }
@@ -1575,16 +1575,16 @@ class MacroAssemblerMIPS : public Assembler
             Label notZero;
             branchTest32(Assembler::NonZero, dest, dest, &notZero);
 
-            if (Assembler::HasSSE41()) {
-                ptest(src, src);
-                j(Assembler::NonZero, fail);
-            } else {
+//            if (Assembler::HasSSE41()) {
+//                ptest(src, src);
+//                j(Assembler::NonZero, fail);
+//            } else {
                 // bit 0 = sign of low float
                 // bits 1 to 3 = signs of higher floats
                 movmskps(src, dest);
                 andl(Imm32(1), dest);
                 j(Assembler::NonZero, fail);
-            }
+//            }
 
             bind(&notZero);
         }

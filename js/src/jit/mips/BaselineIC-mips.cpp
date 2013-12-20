@@ -91,6 +91,7 @@ ICBinaryArith_Int32::Compiler::generateStubCode(MacroAssembler &masm)
     Register scratchReg = BaselineTailCallReg;
 
     Label revertRegister, maybeNegZero;
+#if 0
     switch(op_) {
       case JSOP_ADD:
         // Add R0 and R1.  Don't need to explicitly unbox.
@@ -220,7 +221,7 @@ ICBinaryArith_Int32::Compiler::generateStubCode(MacroAssembler &masm)
       default:
        MOZ_ASSUME_UNREACHABLE("Unhandled op for BinaryArith_Int32.  ");
     }
-
+#endif
     // Return.
     EmitReturnFromIC(masm);
 

@@ -8,13 +8,16 @@
 #define jit_mips_Assembler_mips_h
 
 #include "mozilla/ArrayUtils.h"
+#include <cstddef>
 
 #include "assembler/assembler/MIPSAssembler.h"
 #include "jit/CompactBuffer.h"
 #include "jit/IonCode.h"
 #include "jit/shared/Assembler-shared.h"
+
 #include "assembler/assembler/MacroAssemblerMIPS.h"
-#include "jsscriptinlines.h"
+
+//#include "jsscriptinlines.h"
 
 // From jit/x86/Assembler-x86.h
 namespace js {
@@ -1535,6 +1538,7 @@ class Assembler
     //    masm.int3();
       mcss.breakpoint();
     }
+/*
     // New function, maybe useless
     static bool HasSSE2() {
         JS_ASSERT(0);
@@ -1548,7 +1552,7 @@ class Assembler
         JS_ASSERT(0);
         //return JSC::MacroAssembler::getSSEState() >= JSC::MacroAssembler::HasSSE4_1;
     }
-
+*/
     // The below cmpl methods switch the lhs and rhs when it invokes the
     // macroassembler to conform with intel standard.  When calling this
     // function put the left operand on the left as you would expect.
@@ -1919,6 +1923,13 @@ class Assembler
         }else 
             mcss.push(mRegisterID(src.code()));
     }
+    void push(const Address &src) {
+        //masm.push_m(src.offset, src.base.code());
+        mcss.sub32(mTrustedImm32(4), mRegisterID(sp.code()));
+        mcss.load32(mAddress(src.base.code(), src.offset), dataTempRegister.code());
+        mcss.store32(dataTempRegister.code(), mAddress(sp.code(), 0));
+    }
+
     void pop(const Operand &src) {
         switch (src.kind()) {
           case Operand::REG:
@@ -2071,7 +2082,7 @@ class Assembler
     // New function
     void cvtsi2ss(const Operand &src, const FloatRegister &dest) {
         JS_ASSERT(0);
-        JS_ASSERT(HasSSE2());
+//        JS_ASSERT(HasSSE2());
         switch (src.kind()) {
           case Operand::REG:
             //masm.cvtsi2ss_rr(src.reg(), dest.code());
@@ -2169,7 +2180,7 @@ class Assembler
     // New function
     void addss(const Operand &src, const FloatRegister &dest) {
         JS_ASSERT(0);
-        JS_ASSERT(HasSSE2());
+//        JS_ASSERT(HasSSE2());
         switch (src.kind()) {
           case Operand::FPREG:
             //masm.addss_rr(src.fpu(), dest.code());
@@ -2212,7 +2223,7 @@ class Assembler
     // New function
     void subss(const Operand &src, const FloatRegister &dest) {
         JS_ASSERT(0);
-        JS_ASSERT(HasSSE2());
+//        JS_ASSERT(HasSSE2());
         switch (src.kind()) {
           case Operand::FPREG:
             //masm.subss_rr(src.fpu(), dest.code());
@@ -2245,7 +2256,7 @@ class Assembler
     // New function
     void mulss(const Operand &src, const FloatRegister &dest) {
         JS_ASSERT(0);
-        JS_ASSERT(HasSSE2());
+//        JS_ASSERT(HasSSE2());
         switch (src.kind()) {
           case Operand::FPREG:
             //masm.mulss_rr(src.fpu(), dest.code());
@@ -2260,7 +2271,7 @@ class Assembler
     // New function
     void mulss(const FloatRegister &src, const FloatRegister &dest) {
         JS_ASSERT(0);
-        JS_ASSERT(HasSSE2());
+//        JS_ASSERT(HasSSE2());
         //masm.mulss_rr(src.code(), dest.code());
     }
     void divsd(const FloatRegister &src, const FloatRegister &dest) {
@@ -2270,7 +2281,7 @@ class Assembler
     // New function
     void divss(const FloatRegister &src, const FloatRegister &dest) {
         JS_ASSERT(0);
-        JS_ASSERT(HasSSE2());
+//        JS_ASSERT(HasSSE2());
         //masm.divss_rr(src.code(), dest.code());
     }
     void divsd(const Operand &src, const FloatRegister &dest) {
@@ -2290,7 +2301,7 @@ class Assembler
     // New function
     void divss(const Operand &src, const FloatRegister &dest) {
         JS_ASSERT(0);
-        JS_ASSERT(HasSSE2());
+//        JS_ASSERT(HasSSE2());
         switch (src.kind()) {
           case Operand::FPREG:
             //masm.divss_rr(src.fpu(), dest.code());
