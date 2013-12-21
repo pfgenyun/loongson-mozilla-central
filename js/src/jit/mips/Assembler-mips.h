@@ -950,7 +950,18 @@ class Assembler
         return masm.currentOffset();
     }
 
-
+    // Load from *src where src can be patched.
+    CodeOffsetLabel movsblWithPatch(const PatchedAbsoluteAddress &src, Register dest) {
+        //masm.movsbl_mr(src.addr, dest.code());
+        JS_ASSERT(0);
+        return masm.currentOffset();
+    }
+    //New function
+    CodeOffsetLabel movzblWithPatch(const PatchedAbsoluteAddress &src, Register dest) {
+        JS_ASSERT(0);
+        //masm.movzbl_mr(src.addr, dest.code());
+        return masm.currentOffset();
+    }
     // folloing is from Assembler-x86-shared.h
    public:
     void align(int alignment) {
@@ -1123,9 +1134,21 @@ class Assembler
         }
     }
     // New function
+    CodeOffsetLabel movswlWithPatch(const PatchedAbsoluteAddress &src, Register dest) {
+        JS_ASSERT(0);
+        //masm.movswl_mr(src.addr, dest.code());
+        return masm.currentOffset();
+    }
+    // New function
     void movsd(const FloatRegister &src, const Address &dest) {
         JS_ASSERT(0);
         //masm.movsd_rm(src.code(), dest.offset, dest.base.code());
+    }
+    // New function
+    CodeOffsetLabel movzwlWithPatch(const PatchedAbsoluteAddress &src, Register dest) {
+        JS_ASSERT(0);
+        //masm.movzwl_mr(src.addr, dest.code());
+        return masm.currentOffset();
     }
     void movss(const Operand &src, const FloatRegister &dest) {
         switch (src.kind()) {
@@ -1140,6 +1163,19 @@ class Assembler
           default:
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
+    }
+    // New function
+    CodeOffsetLabel movlWithPatch(const PatchedAbsoluteAddress &src, Register dest) {
+        JS_ASSERT(0);
+        //masm.movl_mr(src.addr, dest.code());
+        return masm.currentOffset();
+    }
+    // New function
+    CodeOffsetLabel movssWithPatch(const PatchedAbsoluteAddress &src, FloatRegister dest) {
+        JS_ASSERT(0);
+        //JS_ASSERT(HasSSE2());
+        //masm.movss_mr(src.addr, dest.code());
+        return masm.currentOffset();
     }
     // New function
     void movsd(const FloatRegister &src, const BaseIndex &dest) {
@@ -1159,6 +1195,13 @@ class Assembler
           default:
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
+    }
+    // New function
+    CodeOffsetLabel movsdWithPatch(const PatchedAbsoluteAddress &src, FloatRegister dest) {
+        JS_ASSERT(0);
+        //JS_ASSERT(HasSSE2());
+        //masm.movsd_mr(src.addr, dest.code());
+        return masm.currentOffset();
     }
     // New function
     void movss(const Address &src, const FloatRegister &dest) {
@@ -1218,6 +1261,14 @@ class Assembler
 //ok        masm.cvtsd2ss_rr(src.code(), dest.code());
         mcss.convertDoubleToFloat(src.code(), dest.code());
     }
+
+    // Store to *dest where dest can be patched.
+    // New function
+    CodeOffsetLabel movbWithPatch(Register src, const PatchedAbsoluteAddress &dest) {
+        JS_ASSERT(0);
+        //masm.movb_rm(src.code(), dest.addr);
+        return masm.currentOffset();
+    }
     void movzbl(const Operand &src, const Register &dest) {
         switch (src.kind()) {
           case Operand::MEM_REG_DISP:
@@ -1231,6 +1282,12 @@ class Assembler
           default:
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
+    }
+    // New function
+    CodeOffsetLabel movwWithPatch(Register src, const PatchedAbsoluteAddress &dest) {
+        JS_ASSERT(0);
+        //masm.movw_rm(src.code(), dest.addr);
+        return masm.currentOffset();
     }
     void movsbl(const Operand &src, const Register &dest) {
         switch (src.kind()) {
@@ -1246,6 +1303,12 @@ class Assembler
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
+    // New function
+    CodeOffsetLabel movlWithPatch(Register src, const PatchedAbsoluteAddress &dest) {
+        JS_ASSERT(0);
+        //masm.movl_rm(src.code(), dest.addr);
+        return masm.currentOffset();
+    }
     void movb(const Register &src, const Operand &dest) {
         switch (dest.kind()) {
           case Operand::MEM_REG_DISP:
@@ -1259,6 +1322,20 @@ class Assembler
           default:
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
+    }
+    // New function
+    CodeOffsetLabel movssWithPatch(FloatRegister src, const PatchedAbsoluteAddress &dest) {
+        JS_ASSERT(0);
+        //JS_ASSERT(HasSSE2());
+        //masm.movss_rm(src.code(), dest.addr);
+        return masm.currentOffset();
+    }
+    // New function
+    CodeOffsetLabel movsdWithPatch(FloatRegister src, const PatchedAbsoluteAddress &dest) {
+        JS_ASSERT(0);
+        //JS_ASSERT(HasSSE2());
+        //masm.movsd_rm(src.code(), dest.addr);
+        return masm.currentOffset();
     }
     void movb(const Imm32 &src, const Operand &dest) {
         switch (dest.kind()) {

@@ -24,18 +24,6 @@
 #include "vm/Shape.h"
 #include "jsscriptinlines.h"
 
-// Keep not to delete
-#include "jscntxt.h"
-#include "jscompartment.h"
-#include "jit/PerfSpewer.h"
-#include "jit/CodeGenerator.h"
-#include "jit/IonCompartment.h"
-#include "jit/MoveEmitter.h"
-#include "jsscriptinlines.h"
-#include "jsmath.h"
-#include "jit/ParallelFunctions.h"
-
-
 using namespace js;
 using namespace js::jit;
 
@@ -75,7 +63,7 @@ CodeGeneratorMIPS::generatePrologue()
 bool
 CodeGeneratorMIPS::generateEpilogue()
 {
-    masm.bind(returnLabel_);
+    masm.bind(&returnLabel_);
 
 #if JS_TRACE_LOGGING
     masm.tracelogStop();
@@ -647,20 +635,12 @@ CodeGeneratorMIPS::visitAddI(LAddI *ins)
         }
     }
     return true;
-
-    if (ins->rhs()->isConstant())                                             
-    masm.addl(Imm32(ToInt32(ins->rhs())), ToOperand(ins->lhs()));            
-      else                                                                   
-    masm.addl(ToOperand(ins->rhs()), ToRegister(ins->lhs()));                
-    if (ins->snapshot() && !bailoutIf(Assembler::Overflow, ins->snapshot())) 
-          return false;                                                     
-      return true;
 }
 
 bool
 CodeGeneratorMIPS::visitSubI(LSubI *ins)
 {
-   if (ins->rhs()->isConstant())
+    if (ins->rhs()->isConstant())
         masm.subl(Imm32(ToInt32(ins->rhs())), ToOperand(ins->lhs()));
     else
         masm.subl(ToOperand(ins->rhs()), ToRegister(ins->lhs()));
@@ -798,7 +778,7 @@ CodeGeneratorMIPS::visitMulI(LMulI *ins)
     return true;
 }
 
-class ReturnZero : public OutOfLineCodeBase<CodeGeneratorX86Shared>
+class ReturnZero : public OutOfLineCodeBase<CodeGeneratorMIPS>
 {
     Register reg_;
 
@@ -807,7 +787,7 @@ class ReturnZero : public OutOfLineCodeBase<CodeGeneratorX86Shared>
       : reg_(reg)
     { }
 
-    virtual bool accept(CodeGeneratorX86Shared *codegen) {
+    virtual bool accept(CodeGeneratorMIPS *codegen) {
         return codegen->visitReturnZero(this);
     }
     Register reg() const {
@@ -816,7 +796,7 @@ class ReturnZero : public OutOfLineCodeBase<CodeGeneratorX86Shared>
 };
 
 bool
-CodeGeneratorX86Shared::visitReturnZero(ReturnZero *ool)
+CodeGeneratorMIPS::visitReturnZero(ReturnZero *ool)
 {
     masm.mov(ImmWord(0), ool->reg());
     masm.jmp(ool->rejoin());
@@ -1114,7 +1094,7 @@ class ModOverflowCheck : public OutOfLineCodeBase<CodeGeneratorMIPS>
       : ins_(ins), rhs_(rhs)
     { }
 
-    virtual bool accept(CodeGeneratorX86Shared *codegen) {
+    virtual bool accept(CodeGeneratorMIPS *codegen) {
         return codegen->visitModOverflowCheck(this);
     }
     Label *done() {
@@ -1134,7 +1114,7 @@ CodeGeneratorMIPS::visitModOverflowCheck(ModOverflowCheck *ool)
     masm.cmpl(ool->rhs(), Imm32(-1));
     if (ool->ins()->mir()->isTruncated()) {
         masm.j(Assembler::NotEqual, ool->rejoin());
-        masm.mov(ImmWord(0), edx);
+        masm.mov(ImmWord(0), t7/*edx*/);
         masm.jmp(ool->done());
     } else {
         if (!bailoutIf(Assembler::Equal, ool->ins()->snapshot()))
@@ -1588,7 +1568,7 @@ CodeGeneratorMIPS::visitFloorF(LFloorF *lir)
     FloatRegister scratch = ScratchFloatReg;
     Register output = ToRegister(lir->output());
 
-    if (AssemblerX86Shared::HasSSE41()) {
+    /*if (AssemblerX86Shared::HasSSE41()) {
         // Bail on negative-zero.
         Assembler::Condition bailCond = masm.testNegativeZeroFloat32(input, output);
         if (!bailoutIf(bailCond, lir->snapshot()))
@@ -1601,7 +1581,7 @@ CodeGeneratorMIPS::visitFloorF(LFloorF *lir)
         masm.cmp32(output, Imm32(INT_MIN));
         if (!bailoutIf(Assembler::Equal, lir->snapshot()))
             return false;
-    } else {
+    } else */{
         Label negative, end;
 
         // Branch to a slow path for negative inputs. Doesn't catch NaN or -0.
@@ -1723,7 +1703,7 @@ CodeGeneratorMIPS::visitRound(LRound *lir)
 
             // Test whether the truncated double was integer-valued.
             masm.convertInt32ToDouble(output, scratch);
-            masm.branchDouble(Assembler::DoubleEqualOrUnordered, temp, scratch, &testZero);
+            masm.branchDouble(Assembler::DoubleEqualOrUnordered, temp, scratch, &end);
 
             // Input is not integer-valued, so we rounded off-by-one in the
             // wrong direction. Correct by subtraction.
@@ -1831,6 +1811,15 @@ CodeGeneratorMIPS::visitNegD(LNegD *ins)
     return true;
 }
 
+bool
+CodeGeneratorMIPS::visitNegF(LNegF *ins)
+{
+    FloatRegister input = ToFloatRegister(ins->input());
+    JS_ASSERT(input == ToFloatRegister(ins->output()));
+
+    masm.negateFloat(input);
+    return true;
+}
 
 } // namespace jit
 } // namespace js
@@ -2325,7 +2314,6 @@ CodeGeneratorMIPS::visitAsmJSLoadHeap(LAsmJSLoadHeap *ins)
     loadViewTypeElement(vt, srcAddr, out);
     uint32_t after = masm.size();
     masm.bind(ool->rejoin());
-    // return gen->noteHeapAccess(AsmJSHeapAccess(before, after, vt, ToAnyRegister(out), cmp.offset()));
     bool temp = gen->noteHeapAccess(AsmJSHeapAccess(before, after, vt, ToAnyRegister(out), cmp.offset()));
     return temp;
 }
@@ -2426,7 +2414,6 @@ CodeGeneratorMIPS::visitAsmJSStoreHeap(LAsmJSStoreHeap *ins)
     storeViewTypeElement(vt, value, dstAddr);
     uint32_t after = masm.size();
     masm.bind(&rejoin);
-    // return gen->noteHeapAccess(AsmJSHeapAccess(before, after, cmp.offset()));
     bool temp = gen->noteHeapAccess(AsmJSHeapAccess(before, after, cmp.offset()));
     return temp;
 }
@@ -2520,6 +2507,7 @@ DispatchIonCache::initializeAddCacheState(LInstruction *ins, AddCacheState *addS
     MOZ_ASSUME_UNREACHABLE("x86 needs manual assignment of dispatchScratch");
 }
 
+#ifdef JS_CPU_X86
 void
 GetPropertyParIC::initializeAddCacheState(LInstruction *ins, AddCacheState *addState)
 {
@@ -2531,7 +2519,9 @@ GetPropertyParIC::initializeAddCacheState(LInstruction *ins, AddCacheState *addS
     else
         addState->dispatchScratch = ToRegister(ins->toGetPropertyCacheT()->temp());
 }
+#endif
 
+#ifdef JS_CPU_X86
 void
 GetElementParIC::initializeAddCacheState(LInstruction *ins, AddCacheState *addState)
 {
@@ -2543,7 +2533,9 @@ GetElementParIC::initializeAddCacheState(LInstruction *ins, AddCacheState *addSt
     else
         addState->dispatchScratch = ToRegister(ins->toGetElementCacheT()->temp());
 }
+#endif
 
+#ifdef JS_CPU_X86
 void
 SetPropertyParIC::initializeAddCacheState(LInstruction *ins, AddCacheState *addState)
 {
@@ -2554,7 +2546,9 @@ SetPropertyParIC::initializeAddCacheState(LInstruction *ins, AddCacheState *addS
     else
         addState->dispatchScratch = ToRegister(ins->toSetPropertyCacheT()->tempForDispatchCache());
 }
+#endif
 
+#ifdef JS_CPU_X86
 void
 SetElementParIC::initializeAddCacheState(LInstruction *ins, AddCacheState *addState)
 {
@@ -2566,7 +2560,10 @@ SetElementParIC::initializeAddCacheState(LInstruction *ins, AddCacheState *addSt
     else
         addState->dispatchScratch = ToRegister(ins->toSetElementCacheT()->temp());
 }
+#endif
 
+namespace js {
+namespace jit {
 
 class OutOfLineTruncate : public OutOfLineCodeBase<CodeGeneratorMIPS>
 {
@@ -2594,7 +2591,7 @@ class OutOfLineTruncateFloat32 : public OutOfLineCodeBase<CodeGeneratorMIPS>
       : ins_(ins)
     { }
 
-    bool accept(CodeGeneratorX86 *codegen) {
+    bool accept(CodeGeneratorMIPS *codegen) {
         return codegen->visitOutOfLineTruncateFloat32(this);
     }
     LTruncateFToInt32 *ins() const {
@@ -2602,6 +2599,8 @@ class OutOfLineTruncateFloat32 : public OutOfLineCodeBase<CodeGeneratorMIPS>
     }
 };
 
+} // namespace jit
+} // namespace js
 
 bool
 CodeGeneratorMIPS::visitTruncateDToInt32(LTruncateDToInt32 *ins)

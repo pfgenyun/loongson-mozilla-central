@@ -531,14 +531,15 @@ JitRuntime::generateVMWrapper(JSContext *cx, const VMFunction &f)
       case Type_Pointer:
       case Type_Bool:
         outReg = regs.takeAny();
-        masm.reserveStack(sizeof(int32));
+        masm.reserveStack(sizeof(int32_t));
         masm.movl(sp, outReg);
         break;
 
       case Type_Double:
         outReg = regs.takeAny();
         masm.reserveStack(sizeof(double));
-        masm.movl(esp, outReg);
+        //TODO
+        //masm.movl(esp, outReg);
         break;
 
       default:
@@ -663,7 +664,8 @@ JitRuntime::generateVMWrapper(JSContext *cx, const VMFunction &f)
 #endif
 
     masm.bind(&exception);
-    masm.handleException();
+    //TODO, delete it or create function
+    //masm.handleException();
 
     Linker linker(masm);
     IonCode *wrapper = linker.newCode<NoGC>(cx, JSC::OTHER_CODE);

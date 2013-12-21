@@ -51,7 +51,7 @@ MacroAssemblerMIPS::loadConstantDouble(double d, const FloatRegister &dest)
     if (!dbl)
         return;
 //    masm.movsd_mr(reinterpret_cast<const void *>(dbl->uses.prev()), dest.code());
-    mcss.loadDouble(reinterpret_cast<void *>(dbl.uses.prev()), dest.code());
+    mcss.loadDouble(reinterpret_cast<const void *>(dbl->uses.prev()), dest.code());
     dbl->uses.setPrev(masm.size());
 }
 
@@ -62,7 +62,7 @@ MacroAssemblerMIPS::addConstantDouble(double d, const FloatRegister &dest)
     if (!dbl)
         return;
 //    masm.addsd_mr(reinterpret_cast<const void *>(dbl->uses.prev()), dest.code());  // need to modify . by wangqing
-    masm.addDouble(reinterpret_cast<const void *>(dbl->uses.prev()), dest.code()); 
+    mcss.loadDouble(reinterpret_cast<const void *>(dbl->uses.prev()), dest.code()); 
     dbl->uses.setPrev(masm.size());
 }
 
@@ -99,7 +99,7 @@ MacroAssemblerMIPS::loadConstantFloat32(float f, const FloatRegister &dest)
     if (!flt)
         return;
 //    masm.movss_mr(reinterpret_cast<const void *>(flt->uses.prev()), dest.code());
-   mcss.loadFloat(reinterpret_cast<void *>(dbl.uses.prev()), dest.code());
+   mcss.loadFloat(reinterpret_cast<void *>(flt->uses.prev()), dest.code());
     flt->uses.setPrev(masm.size());
 }
 
@@ -110,7 +110,7 @@ MacroAssemblerMIPS::addConstantFloat32(float f, const FloatRegister &dest)
     if (!flt)
         return;
 //    masm.addss_mr(reinterpret_cast<const void *>(flt->uses.prev()), dest.code()); // need to modify. by wangqing
-    masm.addFloat(reinterpret_cast<const void *>(flt->uses.prev()), dest.code()); 
+    mcss.loadFloat(reinterpret_cast<const void *>(flt->uses.prev()), dest.code()); 
     flt->uses.setPrev(masm.size());
 }
 
@@ -171,29 +171,29 @@ MacroAssemblerMIPS::passABIArg(const MoveOperand &from)
 {
     MoveOperand to;
 
-    ++passedArgs_; //参数个数加1
+    ++passedArgs_;
 
-    if(passedArgs_ <= 4){ //参数小于4个时，仅用寄存器便可以完成参数传递
+    if (passedArgs_ <= 4) {
         Register destReg;
         FloatRegister destFloatReg;
     
         if (from.isDouble() && GetArgFloatReg(passedArgs_, &destFloatReg)) {
             to = MoveOperand(destFloatReg);
-            enoughMemory_ &= moveResolver_.addMove(from, to, Move::DOUBLE);
+            enoughMemory_ &= moveResolver_.addMove(from, to, MoveOp::DOUBLE);
         }else {
             GetArgReg(passedArgs_, &destReg); 
             to = MoveOperand(destReg);
-            enoughMemory_ &= moveResolver_.addMove(from, to, Move::GENERAL);
+            enoughMemory_ &= moveResolver_.addMove(from, to, MoveOp::GENERAL);
         }
-    }else{//参数大于四个时，需要通过堆栈来存放传递参数
+    } else {
 #if 1
         to = MoveOperand(StackPointer, stackForCall_);
         if (from.isDouble()) {
             stackForCall_ += sizeof(double);
-            enoughMemory_ &= moveResolver_.addMove(from, to, Move::DOUBLE);
+            enoughMemory_ &= moveResolver_.addMove(from, to, MoveOp::DOUBLE);
         } else {
             stackForCall_ += sizeof(int32_t);
-            enoughMemory_ &= moveResolver_.addMove(from, to, Move::GENERAL);
+            enoughMemory_ &= moveResolver_.addMove(from, to, MoveOp::GENERAL);
         }
 #endif
     }
@@ -211,81 +211,6 @@ MacroAssemblerMIPS::passABIArg(const FloatRegister &reg)
     passABIArg(MoveOperand(reg));
 }
 
-void
-MacroAssemblerMIPS::callWithABI(void *fun, Result result)
-{
-    JS_ASSERT(inCall_);
-    JS_ASSERT(args_ == passedArgs_);//检测所有的参数是否都传递进来
-
-    uint32_t stackAdjust = ((passedArgs_ > 4) ? passedArgs_ : 4) * STACK_SLOT_SIZE;//为参数预留栈空间
-    if (dynamicAlignment_) {//非对齐ABI调用
-#if 0
-        stackAdjust = stackForCall_
-                    + ComputeByteAlignment(stackForCall_,
-                                           StackAlignment);
-#else
-        stackAdjust += ComputeByteAlignment(stackAdjust + STACK_SLOT_SIZE, StackAlignment);
-#endif
-    } else {
-        stackAdjust +=
-            ComputeByteAlignment(framePushed_ + stackAdjust, StackAlignment);
-    }
-
-    reserveStack(stackAdjust);
-//    subl(Imm32(16), StackPointer);
-
-    // Position all arguments.
-    {
-        enoughMemory_ &= moveResolver_.resolve();
-        if (!enoughMemory_)
-            return;
-
-        MoveEmitter emitter(*this);// ？
-        emitter.emit(moveResolver_);
-        emitter.finish();
-    }
-
-#ifdef DEBUG
-    {
-        // Check call alignment.
-        Label good;
-        movl(sp, t0);
-        testl(t0, Imm32(StackAlignment - 1));
-        j(Equal, &good);
-        breakpoint();
-        bind(&good);
-    }
-#endif
-
-//ok    //ma_call
-    call(ImmWord(fun));
-
-//    addl(Imm32(16), StackPointer);
-    freeStack(stackAdjust);
-    if (result == DOUBLE) {
-        reserveStack(sizeof(double));//申请空间
-        fstp(Operand(sp, 0));//，
-        movsd(Operand(sp, 0), ReturnFloatReg);//sp指向的值加载至ReturnFloatReg；
-        freeStack(sizeof(double));
-    }
-    if (dynamicAlignment_)
-        //pop(sp);
-        movl(Operand(sp, 0), sp);
-
-    JS_ASSERT(inCall_);
-    inCall_ = false;
-}
-  //NOTE*:this is new in ff24
-void
-MacroAssemblerMIPS::callWithABI(const Address &fun, Result result)
-{
-    uint32_t stackAdjust;
-    callWithABIPre(&stackAdjust);
-    call(Operand(fun));
-    callWithABIPost(stackAdjust, result);
-}
-
-  //NOTE*:this is new in ff24
 void
 MacroAssemblerMIPS::callWithABIPre(uint32_t *stackAdjust)
 {
@@ -319,7 +244,8 @@ MacroAssemblerMIPS::callWithABIPre(uint32_t *stackAdjust)
     {
         // Check call alignment.
         Label good;
-        testl(esp, Imm32(StackAlignment - 1));
+        //TODO
+        //testl(esp, Imm32(StackAlignment - 1));
         j(Equal, &good);
         breakpoint();
         bind(&good);
@@ -342,6 +268,89 @@ MacroAssemblerMIPS::callWithABIPost(uint32_t stackAdjust, Result result)
 
     JS_ASSERT(inCall_);
     inCall_ = false;*/
+}
+void
+MacroAssemblerMIPS::callWithABI(void *fun, Result result)
+{
+    JS_ASSERT(inCall_);
+    JS_ASSERT(args_ == passedArgs_);
+
+    uint32_t stackAdjust = ((passedArgs_ > 4) ? passedArgs_ : 4) * STACK_SLOT_SIZE;
+    if (dynamicAlignment_) {
+#if 0
+        stackAdjust = stackForCall_
+                    + ComputeByteAlignment(stackForCall_,
+                                           StackAlignment);
+#endif
+        stackAdjust += ComputeByteAlignment(stackAdjust + STACK_SLOT_SIZE, StackAlignment);
+    } else {
+        stackAdjust +=
+            ComputeByteAlignment(framePushed_ + stackAdjust, StackAlignment);
+    }
+
+    reserveStack(stackAdjust);
+//    subl(Imm32(16), StackPointer);
+
+    // Position all arguments.
+    {
+        enoughMemory_ &= moveResolver_.resolve();
+        if (!enoughMemory_)
+            return;
+
+        MoveEmitter emitter(*this);
+        emitter.emit(moveResolver_);
+        emitter.finish();
+    }
+
+#ifdef DEBUG
+    {
+        // Check call alignment.
+        Label good;
+        movl(sp, t0);
+        testl(t0, Imm32(StackAlignment - 1));
+        j(Equal, &good);
+        breakpoint();
+        bind(&good);
+    }
+#endif
+
+//ok    //ma_call
+    call(ImmPtr(fun));
+
+//    addl(Imm32(16), StackPointer);
+    freeStack(stackAdjust);
+    if (result == DOUBLE) {
+        reserveStack(sizeof(double));//申请空间
+        fstp(Operand(sp, 0));//，
+        movsd(Operand(sp, 0), ReturnFloatReg);//sp指向的值加载至ReturnFloatReg；
+        freeStack(sizeof(double));
+    }
+    if (dynamicAlignment_)
+        //pop(sp);
+        movl(Operand(sp, 0), sp);
+
+    JS_ASSERT(inCall_);
+    inCall_ = false;
+}
+
+// New function
+void
+MacroAssemblerMIPS::callWithABI(AsmJSImmPtr fun, Result result)
+{
+    uint32_t stackAdjust;
+    callWithABIPre(&stackAdjust);
+    call(fun);
+    callWithABIPost(stackAdjust, result);
+}
+
+// New function
+void
+MacroAssemblerMIPS::callWithABI(const Address &fun, Result result)
+{
+    uint32_t stackAdjust;
+    callWithABIPre(&stackAdjust);
+    call(Operand(fun));
+    callWithABIPost(stackAdjust, result);
 }
 
 void
