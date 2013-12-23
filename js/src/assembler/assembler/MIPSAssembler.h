@@ -576,9 +576,23 @@ public:
                  | (ft << OP_SH_FT));
     }
 
+    // add by wangqing, 2013-12-23
+    void adds(FPRegisterID fd, FPRegisterID fs, FPRegisterID ft)
+    {
+        emitInst(0x46000000 | (fd << OP_SH_FD) | (fs << OP_SH_FS)
+                 | (ft << OP_SH_FT));
+    }
+
     void subd(FPRegisterID fd, FPRegisterID fs, FPRegisterID ft)
     {
         emitInst(0x46200001 | (fd << OP_SH_FD) | (fs << OP_SH_FS)
+                 | (ft << OP_SH_FT));
+    }
+
+    // add by wangqing, 2013-12-23
+    void subs(FPRegisterID fd, FPRegisterID fs, FPRegisterID ft)
+    {
+        emitInst(0x46000001 | (fd << OP_SH_FD) | (fs << OP_SH_FS)
                  | (ft << OP_SH_FT));
     }
 
@@ -588,9 +602,23 @@ public:
                  | (ft << OP_SH_FT));
     }
 
+    // add by wangqing, 2013-12-23
+    void muls(FPRegisterID fd, FPRegisterID fs, FPRegisterID ft)
+    {
+        emitInst(0x46000002 | (fd << OP_SH_FD) | (fs << OP_SH_FS)
+                 | (ft << OP_SH_FT));
+    }
+
     void divd(FPRegisterID fd, FPRegisterID fs, FPRegisterID ft)
     {
         emitInst(0x46200003 | (fd << OP_SH_FD) | (fs << OP_SH_FS)
+                 | (ft << OP_SH_FT));
+    }
+
+    // add by wangqing, 2013-12-23
+    void divs(FPRegisterID fd, FPRegisterID fs, FPRegisterID ft)
+    {
+        emitInst(0x46000003 | (fd << OP_SH_FD) | (fs << OP_SH_FS)
                  | (ft << OP_SH_FT));
     }
 
@@ -666,9 +694,21 @@ public:
         emitInst(0x46200004 | (fd << OP_SH_FD) | (fs << OP_SH_FS));
     }
 
+    // add by wangqing, 2013-12-23
+    void sqrts(FPRegisterID fd, FPRegisterID fs)
+    {
+        emitInst(0x46000004 | (fd << OP_SH_FD) | (fs << OP_SH_FS));
+    }
+
     void truncwd(FPRegisterID fd, FPRegisterID fs)
     {
         emitInst(0x4620000d | (fd << OP_SH_FD) | (fs << OP_SH_FS));
+    }
+
+    // add by wangqing, 2013-12-23
+    void truncws(FPRegisterID fd, FPRegisterID fs)
+    {
+        emitInst(0x4600000d | (fd << OP_SH_FD) | (fs << OP_SH_FS));
     }
 
     // by xsb: fix me
@@ -677,9 +717,20 @@ public:
         emitInst(0x4620000f | (fd << OP_SH_FD) | (fs << OP_SH_FS));
     }
 
+    // add by wangqing, 2013-12-23
+    void floorws(FPRegisterID fd, FPRegisterID fs)
+    {
+        emitInst(0x4600000f | (fd << OP_SH_FD) | (fs << OP_SH_FS));
+    }
     void cvtdw(FPRegisterID fd, FPRegisterID fs)
     {
         emitInst(0x46800021 | (fd << OP_SH_FD) | (fs << OP_SH_FS));
+    }
+
+    // add by wangqing, 2013-12-23
+    void cvtsw(FPRegisterID fd, FPRegisterID fs)
+    {
+        emitInst(0x46800020 | (fd << OP_SH_FD) | (fs << OP_SH_FS));
     }
 
     void cvtds(FPRegisterID fd, FPRegisterID fs)

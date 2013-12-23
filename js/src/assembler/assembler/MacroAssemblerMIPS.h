@@ -659,6 +659,14 @@ public:
         }
     }
 
+    // add by wangqing, 2013-12-23
+    void load16SignExtend(const void* address, RegisterID dest)
+    {
+        move(ImmPtr(address), addrTempRegister);
+        //m_assembler.lui(addrTempRegister, (ImmPtr(address)).m_value >> 16);
+        //m_assembler.ori(addrTempRegister, addrTempRegister, (ImmPtr(address).m_value) & 0x0000ffff);
+        m_assembler.lh(dest, addrTempRegister, 0);
+    }
     void load16ZeroExtend(BaseIndex address, RegisterID dest)
     {
         if (address.offset >= -32768 && address.offset <= 32767
@@ -686,6 +694,15 @@ public:
                              immTempRegister);
             m_assembler.lhu(dest, addrTempRegister, address.offset);
         }
+    }
+
+    // add by wangqing, 2013-12-23
+    void load16ZeroExtend(const void* address, RegisterID dest)
+    {
+        move(ImmPtr(address), addrTempRegister);
+        //m_assembler.lui(addrTempRegister, (ImmPtr(address)).m_value >> 16);
+        //m_assembler.ori(addrTempRegister, addrTempRegister, (ImmPtr(address)).m_value & 0x0000ffff);
+        m_assembler.lhu(dest, addrTempRegister, 0);
     }
 
     void load8SignExtend(ImplicitAddress address, RegisterID dest)
@@ -751,6 +768,15 @@ public:
         }
     }
 
+    // add by wangqing, 2013-12-23
+    void load8SignExtend(const void* address, RegisterID dest)
+    {
+        move(ImmPtr(address), addrTempRegister);
+        //m_assembler.lui(addrTempRegister, (ImmPtr(address)).m_value >> 16);
+        //m_assembler.ori(addrTempRegister, addrTempRegister, (ImmPtr(address)).m_value & 0x0000ffff);
+        m_assembler.lb(dest, addrTempRegister, 0);
+    }
+
     void load8ZeroExtend(BaseIndex address, RegisterID dest)
     {
         if (address.offset >= -32768 && address.offset <= 32767
@@ -780,6 +806,16 @@ public:
         }
     }
 
+    // add by wangqing, 2013-12-23
+    void load8ZeroExtend(const void* address, RegisterID dest)
+    {
+         move(ImmPtr(address), addrTempRegister);
+        //m_assembler.lui(addrTempRegister, (ImmPtr(address)).m_value >> 16);
+        //m_assembler.ori(addrTempRegister, addrTempRegister, (ImmPtr(address)).m_value & 0x0000ffff);
+
+        m_assembler.lbu(dest, addrTempRegister, 0);
+    }
+
     void negDouble(FPRegisterID src, FPRegisterID dest)
     {
         m_assembler.negd(dest, src);
@@ -795,9 +831,21 @@ public:
         m_assembler.sqrtd(dst, src);
     }
 
+    // add by wangqing, 2013-12-23
+    void sqrtFloat(FPRegisterID src, FPRegisterID dst)
+    {
+        m_assembler.sqrts(dst, src);
+    }
+
     void floorDouble(FPRegisterID src, FPRegisterID dst)
     {
         m_assembler.floorwd(dst, src);
+    }
+
+    // add by wangqing, 2013-12-23
+    void floorFloat(FPRegisterID src, FPRegisterID dst)
+    {
+        m_assembler.floorws(dst, src);
     }
 
     // Memory access operations:
@@ -929,7 +977,8 @@ public:
 #endif
         }
     }
-
+    
+    // add by wangqing, 2013-12-23
     void load32(const void* address, RegisterID dest)
     {
         /*
@@ -937,6 +986,8 @@ public:
             lw  dest, 0(addrTemp)
         */
         move(ImmPtr(address), addrTempRegister);
+        //m_assembler.lui(addrTempRegister, (ImmPtr(address)).m_value >> 16);
+        //m_assembler.ori(addrTempRegister, addrTempRegister, (ImmPtr(address)).m_value & 0x0000ffff);
         m_assembler.lw(dest, addrTempRegister, 0);
     }
 
@@ -1163,6 +1214,15 @@ public:
         }
     }
 
+    // add by wangqing, 2013-12-23
+    void store8(RegisterID src, const void* address)
+    {
+        move(ImmPtr(address), addrTempRegister);
+        //m_assembler.lui(addrTempRegister, (ImmPtr(address)).m_value >> 16);
+        //m_assembler.ori(addrTempRegister, addrTempRegister, (ImmPtr(address)).m_value & 0x0000ffff);
+        m_assembler.sb(src, addrTempRegister, 0);
+    }
+
     void store8(TrustedImm32 imm, BaseIndex address)
     {
         if (!imm.m_isPointer && !imm.m_value)
@@ -1274,6 +1334,15 @@ public:
                              immTempRegister);
             m_assembler.sh(src, addrTempRegister, address.offset);
         }
+    }
+
+    // add by wangqing, 2013-12-23
+    void store16(RegisterID src, const void* address)
+    {
+        move(ImmPtr(address), addrTempRegister);
+        //m_assembler.lui(addrTempRegister, ImmPtr(address).m_value >> 16);
+        //m_assembler.ori(addrTempRegister, addrTempRegister, ImmPtr(address).m_value & 0x0000ffff);
+        m_assembler.sh(src, addrTempRegister, 0);
     }
 
     void store16(TrustedImm32 imm, BaseIndex address)
@@ -1389,6 +1458,14 @@ public:
         }
     }
 
+    // add by wangqing, 2013-12-23
+    void store32(RegisterID src, const void* address)
+    {
+        move(ImmPtr(address), addrTempRegister);
+        //m_assembler.lui(addrTempRegister, ImmPtr(address).m_value >> 16);
+        //m_assembler.ori(addrTempRegister, addrTempRegister, ImmPtr(address).m_value & 0x0000ffff);
+        m_assembler.sw(src, addrTempRegister, 0);
+    }
     void store32(TrustedImm32 imm, BaseIndex address)
     {
         if (!imm.m_isPointer && !imm.m_value)
@@ -2362,19 +2439,33 @@ public:
             m_assembler.cvtds(dest, dest);
         }
     }
-
-    DataLabelPtr loadFloat(const void* address, FPRegisterID dest)
+    
+    // add by wangqing, 2013-12-23
+    void loadFloat(const void* address, FPRegisterID dest)
     {
-        DataLabelPtr label = moveWithPatch(ImmPtr(address), addrTempRegister);
+        move(ImmPtr(address), addrTempRegister); 
+        //m_assembler.lui(addrTempRegister, ImmPtr(address).m_value >> 16);
+        //m_assembler.ori(addrTempRegister, addrTempRegister, ImmPtr(address).m_value & 0x0000ffff);
         /*
             lwc1        dest, 0(addrTemp)
             cvt.d.s     dest, dest
         */
         m_assembler.lwc1(dest, addrTempRegister, 0);
         m_assembler.cvtds(dest, dest);
+    }
+/*
+    DataLabelPtr loadFloat(const void* address, FPRegisterID dest)
+    {
+        DataLabelPtr label = moveWithPatch(ImmPtr(address), addrTempRegister);
+        
+         //   lwc1        dest, 0(addrTemp)
+         //   cvt.d.s     dest, dest
+        
+        m_assembler.lwc1(dest, addrTempRegister, 0);
+        m_assembler.cvtds(dest, dest);
         return label;
     }
-
+*/
     void loadDouble(ImplicitAddress address, FPRegisterID dest)
     {
 #if WTF_MIPS_ISA(1)
@@ -2466,9 +2557,12 @@ public:
 #endif
     }
 
-    DataLabelPtr loadDouble(const void* address, FPRegisterID dest)
+    // add by wangqing, 2013-12-23
+    void loadDouble(const void* address, FPRegisterID dest)
     {
-        DataLabelPtr label = moveWithPatch(ImmPtr(address), addrTempRegister);
+        move(ImmPtr(address), addrTempRegister);
+        //m_assembler.lui(addrTempRegister, ImmPtr(address).m_value >> 16);
+        //m_assembler.ori(addrTempRegister, addrTempRegister, ImmPtr(address).m_value & 0x0000ffff);
 #if WTF_MIPS_ISA(1)
         /*
             lwc1        dest, 0(addrTemp)
@@ -2482,9 +2576,29 @@ public:
         */
         m_assembler.ldc1(dest, addrTempRegister, 0);
 #endif
-        return label;
-    }
 
+    }
+/*
+    DataLabelPtr loadDouble(const void* address, FPRegisterID dest)
+    {
+        DataLabelPtr label = moveWithPatch(ImmPtr(address), addrTempRegister);
+#if WTF_MIPS_ISA(1)
+        
+        //     lwc1        dest, 0(addrTemp)
+        //    lwc1        dest+1, 4(addrTemp)
+         
+        m_assembler.lwc1(dest, addrTempRegister, 0);
+        m_assembler.lwc1(FPRegisterID(dest + 1), addrTempRegister, 4);
+#else
+        
+        //    ldc1        dest, 0(addrTemp)
+        
+        m_assembler.ldc1(dest, addrTempRegister, 0);
+#endif
+        return label;
+
+    }
+*/
     void storeFloat(FPRegisterID src, BaseIndex address)
     {
         lea(address, addrTempRegister);
@@ -2506,6 +2620,12 @@ public:
             m_assembler.addu(addrTempRegister, addrTempRegister, address.base);
             m_assembler.swc1(src, addrTempRegister, address.offset);
         }
+    }
+
+    void storeFloat(FPRegisterID src, const void* address)
+    {
+        move(ImmPtr(address), addrTempRegister);
+        m_assembler.swc1(src, addrTempRegister, 0);
     }
 
     void storeFloat(ImmDouble imm, Address address)
@@ -2568,6 +2688,15 @@ public:
         }
 #endif
     }
+    
+    // add by wangqing, 2013-12-23
+    void storeDouble(FPRegisterID src, const void* address)
+    {
+        move(ImmPtr(address), addrTempRegister); 
+        //m_assembler.lui(addrTempRegister, ImmPtr(address).m_value >> 16);
+        //m_assembler.ori(addrTempRegister, addrTempRegister, ImmPtr(address).m_value & 0x0000ffff);
+        m_assembler.sdc1(src, addrTempRegister, 0);
+    }
 
     void storeDouble(ImmDouble imm, Address address)
     {
@@ -2610,6 +2739,25 @@ public:
         m_assembler.addd(dest, dest, fpTempRegister);
     }
 
+    // add addFloat by wangqing, 2013-12-23
+    void addFloat(FPRegisterID src, FPRegisterID dest)
+    {
+        m_assembler.adds(dest, dest, src);
+    }
+
+    void addFloat(Address src, FPRegisterID dest)
+    {
+        loadFloat(src, fpTempRegister);
+        m_assembler.adds(dest, dest, fpTempRegister);
+    }
+    
+    void addFloat(const void* src, FPRegisterID dest)
+    {
+        loadFloat(src, fpTempRegister);
+        m_assembler.adds(dest, dest, fpTempRegister);
+    }
+
+
     void subDouble(FPRegisterID src, FPRegisterID dest)
     {
         m_assembler.subd(dest, dest, src);
@@ -2619,6 +2767,18 @@ public:
     {
         loadDouble(src, fpTempRegister);
         m_assembler.subd(dest, dest, fpTempRegister);
+    }
+
+    // add subFloat by wangqing, 2013-12-23
+    void subFloat(FPRegisterID src, FPRegisterID dest)
+    {
+        m_assembler.subs(dest, dest, src);
+    }
+
+    void subFloat(Address src, FPRegisterID dest)
+    {
+        loadDouble(src, fpTempRegister);
+        m_assembler.subs(dest, dest, fpTempRegister);
     }
 
     void mulDouble(FPRegisterID src, FPRegisterID dest)
@@ -2632,6 +2792,18 @@ public:
         m_assembler.muld(dest, dest, fpTempRegister);
     }
 
+    // add mulFloat by wangqing, 2012-12-23
+    void mulFloat(FPRegisterID src, FPRegisterID dest)
+    {
+        m_assembler.muls(dest, dest, src);
+    }
+
+    void mulFloat(Address src, FPRegisterID dest)
+    {
+        loadDouble(src, fpTempRegister);
+        m_assembler.muls(dest, dest, fpTempRegister);
+    }
+
     void divDouble(FPRegisterID src, FPRegisterID dest)
     {
         m_assembler.divd(dest, dest, src);
@@ -2641,6 +2813,18 @@ public:
     {
         loadDouble(src, fpTempRegister);
         m_assembler.divd(dest, dest, fpTempRegister);
+    }
+
+    // add divFloat by wangqing, 2013-12-23
+    void divFloat(FPRegisterID src, FPRegisterID dest)
+    {
+        m_assembler.divs(dest, dest, src);
+    }
+
+    void divFloat(Address src, FPRegisterID dest)
+    {
+        loadDouble(src, fpTempRegister);
+        m_assembler.divs(dest, dest, fpTempRegister);
     }
 
     void convertUInt32ToDouble(RegisterID src, FPRegisterID dest)
@@ -2697,6 +2881,34 @@ public:
         load32(src.m_ptr, dataTempRegister);
         m_assembler.mtc1(dataTempRegister, fpTempRegister);
         m_assembler.cvtdw(dest, fpTempRegister);
+    }
+
+    // add convertInt32ToFloat by wangqing, 2013-12-23
+    void convertInt32ToFloat(RegisterID src, FPRegisterID dest)
+    {
+        m_assembler.mtc1(src, fpTempRegister);
+        m_assembler.cvtsw(dest, fpTempRegister);
+    }
+
+    void convertInt32ToFloat(Address src, FPRegisterID dest)
+    {
+        load32(src, dataTempRegister);
+        m_assembler.mtc1(dataTempRegister, fpTempRegister);
+        m_assembler.cvtsw(dest, fpTempRegister);
+    }
+
+    void convertInt32ToFloat(BaseIndex src, FPRegisterID dest)
+    {
+        load32(src, dataTempRegister);
+        m_assembler.mtc1(dataTempRegister, fpTempRegister);
+        m_assembler.cvtsw(dest, fpTempRegister);
+    }
+
+    void convertInt32ToFloat(AbsoluteAddress src, FPRegisterID dest)
+    {
+        load32(src.m_ptr, dataTempRegister);
+        m_assembler.mtc1(dataTempRegister, fpTempRegister);
+        m_assembler.cvtsw(dest, fpTempRegister);
     }
 
     void insertRelaxationWords()
@@ -2884,7 +3096,14 @@ public:
         m_assembler.truncwd(fpTempRegister, src);
         m_assembler.mfc1(dest, fpTempRegister);
     }
-    
+   
+    // add by wangqing, 2013-12-23 
+    void truncateFloatToInt32(FPRegisterID src, RegisterID dest)
+    {
+        m_assembler.truncws(fpTempRegister, src);
+        m_assembler.mfc1(dest, fpTempRegister);
+    }
+
 public:
     AssemblerType_T& assembler(){ return m_assembler; }
 
