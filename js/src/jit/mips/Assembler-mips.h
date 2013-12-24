@@ -486,6 +486,29 @@ class Assembler
                }
     }
 
+    //by weizhenwei, 2013.12.24
+    static inline DoubleCondition DoubleConditionFromCondition(Condition cond) {
+		if ((cond == Equal) || (cond == Zero)) {
+				return DoubleEqual;
+		} else if ((cond == NotEqual) || (cond == NonZero)) {
+				return DoubleNotEqual;
+		} else if ((cond == Above) || (cond == GreaterThan)) {
+				return DoubleGreaterThan;
+		} else if ((cond == AboveOrEqual) || (cond == GreaterThanOrEqual)) {
+				return DoubleGreaterThanOrEqual;
+		} else if ((cond == Below) || (cond == LessThan)) {
+				return DoubleLessThan;
+		} else if ((cond == BelowOrEqual) || (cond == LessThanOrEqual)) {
+				return DoubleLessThanOrEqual;
+		} else if (cond == Parity) {
+				return DoubleUnordered;
+		} else if (cond == NoParity) {
+				return DoubleOrdered;
+		} else {
+				JS_ASSERT(0);
+		}
+    }
+
     static void TraceDataRelocations(JSTracer *trc, IonCode *code, CompactBufferReader &reader);
 
     // MacroAssemblers hold onto gcthings, so they are traced by the GC.
@@ -3363,6 +3386,10 @@ class Assembler
         masm.sll(rd.code(), rt.code(), shamt.value);
     }
         
+    void sllv(const Register &rd, const Register &rt, const Register &rs)
+    {
+        masm.sllv(rd.code(), rt.code(), rs.code());
+    }
     void sllv(const Register &rd, const Register &rt, const Register &rs)
     {
         masm.sllv(rd.code(), rt.code(), rs.code());
