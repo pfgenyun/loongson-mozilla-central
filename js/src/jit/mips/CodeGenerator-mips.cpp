@@ -100,32 +100,52 @@ CodeGeneratorMIPS::emitBranch(Assembler::Condition cond, MBasicBlock *mirTrue,
     }
 }
 
-//by weizhenwei, 2013.12.23
+// By weizhenwei, 2013.12.23
+// From jit/shared/CodeGenerator-shared.cpp
+void
+CodeGeneratorMIPS::jumpToBlockDouble(MBasicBlock *mir, const FloatRegister &lhs,
+        const FloatRegister &rhs, Assembler::DoubleCondition cond)
+{
+    //TODO: check the if branch, by weizhenwei, 2013.12.24
+    if (Label *oolEntry = labelForBackedgeWithImplicitCheck(mir)) {
+        // Note: the backedge is initially a jump to the next instruction.
+        // It will be patched to the target block's label during link().
+        RepatchLabel rejoin;
+        CodeOffsetJump backedge = masm.jumpWithPatch(&rejoin, lhs, rhs, cond);
+        masm.bind(&rejoin);
+
+        masm.propagateOOM(patchableBackedges_.append(PatchableBackedgeInfo(backedge, mir->lir()->label(), oolEntry)));
+    } else {
+        masm.branchDouble(cond, lhs, rhs, mir->lir()->label());
+    }
+}
 void
 CodeGeneratorMIPS::emitBranch(Assembler::DoubleCondition cond,
         const FloatRegister &lhs, const FloatRegister &rhs,
         MBasicBlock *mirTrue, MBasicBlock *mirFalse, Assembler::NaNCond ifNaN)
 {
-    LBlock *ifTrue = mirTrue->lir();
-    LBlock *ifFalse = mirFalse->lir();
-
     if (ifNaN == Assembler::NaN_IsFalse) {
-        //masm.j(Assembler::Parity, ifFalse->label());
-        masm.branchDouble(Assembler::DoubleUnordered, lhs, rhs, ifFalse->label());
+        //jumpToBlock(mirFalse, Assembler::Parity);
+        //masm.branchDouble(Assembler::DoubleUnordered, lhs, rhs, ifFalse->label());
+        jumpToBlockDouble(mirFalse, lhs, rhs, Assembler::DoubleUnordered);
     } else if (ifNaN == Assembler::NaN_IsTrue) {
-        //masm.j(Assembler::Parity, ifTrue->label());
-        masm.branchDouble(Assembler::DoubleUnordered, lhs, rhs, ifTrue->label());
+        //jumpToBlock(mirTrue, Assembler::Parity);
+        //masm.branchDouble(Assembler::DoubleUnordered, lhs, rhs, ifTrue->label());
+        jumpToBlockDouble(mirTrue, lhs, rhs, Assembler::DoubleUnordered);
     }
 
-    if (isNextBlock(ifFalse)) {
-        //masm.j(cond, ifTrue->label());
-        masm.branchDouble(cond, lhs, rhs, ifTrue->label());
+    if (isNextBlock(mirFalse->lir())) {
+        //jumpToBlock(mirTrue, cond);
+        //masm.branchDouble(cond, lhs, rhs, ifTrue->label());
+        jumpToBlockDouble(mirTrue, lhs, rhs, cond);
     } else {
-        //masm.j(Assembler::InvertCondition(cond), ifFalse->label());
+        //jumpToBlock(mirFalse, Assembler::InvertCondition(cond));
+        //jumpToBlock(mirTrue);
+        //TODO:check this jump is right, by weizhenwei, 2013.12.24
         masm.j(Assembler::InvertCondition(masm.ConditionFromDoubleCondition(cond)),
-                ifFalse->label());
-        if (!isNextBlock(ifTrue))
-            masm.jmp(ifTrue->label());
+                mirFalse->lir()->label());
+        if (!isNextBlock(mirTrue->lir()))
+            masm.jmp(mirTrue->lir()->label());
     }
 }
 

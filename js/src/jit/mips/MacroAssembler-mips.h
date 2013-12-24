@@ -601,6 +601,13 @@ class MacroAssemblerMIPS : public Assembler
         return CodeOffsetJump(size());
     }
 
+    // Add by weizhenwei, 2013.12.24
+    CodeOffsetJump jumpWithPatch(RepatchLabel *label, const FloatRegister &lhs,
+            const FloatRegister &rhs, Assembler::DoubleCondition cond) {
+        branchDoubleImpl(cond, lhs, rhs, label);
+        return CodeOffsetJump(size());
+    }
+
     template <typename S, typename T>
     CodeOffsetJump branchPtrWithPatch(Condition cond, S lhs, T ptr, RepatchLabel *label) {
         branchPtr(cond, lhs, ptr, label);
@@ -1111,6 +1118,51 @@ class MacroAssemblerMIPS : public Assembler
         else
             ucomisd(lhs, rhs);
     }
+
+    //by weizhenwei, 2013.12.24
+    void branchDoubleImpl(DoubleCondition cond, const FloatRegister &lhs,
+                      const FloatRegister &rhs, Label *label)
+    {
+        JmpSrc j;
+        if (cond & DoubleConditionBitInvert) {
+            j = mcss.branchDouble(static_cast<JSC::MacroAssemblerMIPS::DoubleCondition>(cond),
+                    rhs.code(), lhs.code()).m_jmp;
+        } else {
+            j = mcss.branchDouble(static_cast<JSC::MacroAssemblerMIPS::DoubleCondition>(cond),
+                    lhs.code(), rhs.code()).m_jmp;
+        }
+
+        if (label->bound()) {
+            // The jump can be immediately patched to the correct destination.
+            masm.linkJump(j, JmpDst(label->offset()));
+        } else {
+            // Thread the jump list through the unpatched jump targets.
+            JmpSrc prev = JmpSrc(label->use(j.offset()));
+            masm.setNextJump(j, prev);
+        }
+    //    return j;
+    }
+    void branchDoubleImpl(DoubleCondition cond, const FloatRegister &lhs,
+                      const FloatRegister &rhs, RepatchLabel *label)
+    {
+        JmpSrc j;
+        if (cond & DoubleConditionBitInvert) {
+            j = mcss.branchDouble(static_cast<JSC::MacroAssemblerMIPS::DoubleCondition>(cond),
+                    rhs.code(), lhs.code()).m_jmp;
+        } else {
+            j = mcss.branchDouble(static_cast<JSC::MacroAssemblerMIPS::DoubleCondition>(cond),
+                    lhs.code(), rhs.code()).m_jmp;
+        }
+
+        if (label->bound()) {
+            // The jump can be immediately patched to the correct destination.
+            masm.linkJump(j, JmpDst(label->offset()));
+        } else {
+            label->use(j.offset());
+        }
+    //    return j;
+    }
+
     void branchDouble(DoubleCondition cond, const FloatRegister &lhs,
                       const FloatRegister &rhs, Label *label)
     {
@@ -1118,19 +1170,19 @@ class MacroAssemblerMIPS : public Assembler
 
         if (cond == DoubleEqual) {
             Label unordered;
-            j(Parity, &unordered);
-            j(Equal, label);
+            branchDoubleImpl(Assembler::DoubleUnordered, lhs, rhs,  &unordered);
+            branchDoubleImpl(Assembler::DoubleEqual, lhs, rhs, label);
             bind(&unordered);
             return;
         }
         if (cond == DoubleNotEqualOrUnordered) {
-            j(NotEqual, label);
-            j(Parity, label);
+            branchDoubleImpl(Assembler::DoubleNotEqual, lhs, rhs, label);
+            branchDoubleImpl(Assembler::DoubleUnordered, lhs, rhs, label);
             return;
         }
 
         JS_ASSERT(!(cond & DoubleConditionBitSpecial));
-        j(ConditionFromDoubleCondition(cond), label);
+        branchDoubleImpl(cond, lhs, rhs, label);
     }
 
     void compareFloat(DoubleCondition cond, const FloatRegister &lhs, const FloatRegister &rhs) {

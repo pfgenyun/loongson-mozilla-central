@@ -732,7 +732,8 @@ class Assembler
            masm.sw(immTempRegister.code(), addrTempRegister.code(), 0);
             break;
            default:
-            JS_NOT_REACHED("unexpected operand kind");        }
+            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
+        }
     }
     void movl(ImmWord imm, Register dest) {
     	//ok        masm.movl_i32r(imm.value, dest.code());

@@ -79,6 +79,8 @@ class CodeGeneratorMIPS : public CodeGeneratorShared
     void emitBranch(Assembler::DoubleCondition cond, MBasicBlock *ifTrue, MBasicBlock *ifFalse);
 
     //by weizhenwei, 2013.12.23
+    void jumpToBlockDouble(MBasicBlock *mir, const FloatRegister &lhs,
+            const FloatRegister &rhs, Assembler::DoubleCondition cond);
     void emitBranch(Assembler::DoubleCondition cond, const FloatRegister &lhs,
 		const FloatRegister &rhs, MBasicBlock *ifTrue, MBasicBlock *ifFalse,
                 Assembler::NaNCond ifNaN = Assembler::NaN_HandledByCond);
