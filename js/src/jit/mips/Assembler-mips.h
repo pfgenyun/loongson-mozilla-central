@@ -561,8 +561,23 @@ class Assembler
     // Actual assembly emitting functions.
 
     void push(const ImmGCPtr &ptr) {
-        push(Imm32(ptr.value));
+       // push(Imm32(ptr.value));
+       // writeDataRelocation(ptr);
+        /* 
+         * author: wangqing
+         * date: 2013-10-26
+         *
+         * lui immTemp, ptr.value >> 16
+         * ori immTemp, immTemp, ptr.value & 0x0000ffff
+         * writDateRelocation(ptr)
+         * addiu sp, sp, -4
+         * sw immTemp, sp, 0
+         */
+        masm.lui(immTempRegister.code(), (uint32_t)ptr.value >> 16);
+        masm.ori(immTempRegister.code(), immTempRegister.code(), (uint32_t)ptr.value & 0x0000ffff);
         writeDataRelocation(ptr);
+        masm.addiu(JSC::MIPSRegisters::sp, JSC::MIPSRegisters::sp, -4);
+        masm.sw(immTempRegister.code(), JSC::MIPSRegisters::sp, 0);
     }
     void push(const ImmWord imm) {
         push(Imm32(imm.value));
@@ -630,29 +645,94 @@ class Assembler
     }
 
     void movl(const ImmGCPtr &ptr, const Register &dest) {
-         mcss.move(mTrustedImmPtr(reinterpret_cast<const void*>(ptr.value)), dest.code());
+       // mcss.move(mTrustedImmPtr(reinterpret_cast<const void*>(ptr.value)), dest.code());
+       // writeDataRelocation(ptr);
+        /* 
+        * author: wangqing
+        * date: 2013-10-26
+        *
+        * lui dest, ptr.value >> 16
+        * ori dest, dest, ptr.value & 0x0000ffff
+        * writDateRelocation(ptr)
+        */
+        masm.lui(dest.code(), (uint32_t)ptr.value >> 16);
+        masm.ori(dest.code(), dest.code(), (uint32_t)ptr.value & 0x0000ffff);
         writeDataRelocation(ptr);
     }
     void movl(const ImmGCPtr &ptr, const Operand &dest) {
         switch (dest.kind()) {
           case Operand::REG:
-//ok            masm.movl_i32r(ptr.value, dest.reg());
-            mcss.move(mTrustedImm32(ptr.value), dest.reg());
-            writeDataRelocation(ptr);
-            break;
+//ok         masm.movl_i32r(ptr.value, dest.reg());
+//           mcss.move(mTrustedImm32(ptr.value), dest.reg());
+//           writeDataRelocation(ptr);
+
+           /* 
+            * author: wangqing
+            * date: 2013-10-26
+            *
+            * lui dest, ptr.value >> 16
+            * ori dest, dest, ptr.value & 0x0000ffff
+            * writeDataRelocation(ptr);
+            */
+           masm.lui(dest.reg(), (uint32_t)ptr.value >> 16);
+           masm.ori(dest.reg(), dest.reg(), (uint32_t)ptr.value & 0x0000ffff);
+           writeDataRelocation(ptr);
+           break;
           case Operand::MEM_REG_DISP:
-//ok            masm.movl_i32m(ptr.value, dest.disp(), dest.base());
-            mcss.store32(mTrustedImm32(ptr.value), mImplicitAddress(mAddress(dest.base(), dest.disp())));
-            writeDataRelocation(ptr);
-            break;
+//ok         masm.movl_i32m(ptr.value, dest.disp(), dest.base());
+//           mcss.store32(mTrustedImm32(ptr.value), mImplicitAddress(mAddress(dest.base(), dest.disp())));
+//           writeDataRelocation(ptr);
+
+           /* 
+            * author: wangqing
+            * date: 2013-10-26
+            *
+            * lui addrTemp, dest.disp() >> 16
+            * ori addrTemp, addrTemp, dest.disp() & 0x0000ffff
+            * addu addrTemp, addrTemp, dest.base()
+            * lui immTemp, ptr.value >> 16
+            * ori immTemp, immTemp, ptr.value & 0x0000ffff
+            * writeDataRelocation(ptr)
+            * sw immTemp, addrTemp, 0
+            */
+           masm.lui(addrTempRegister.code(), dest.disp() >> 16);
+           masm.ori(addrTempRegister.code(), addrTempRegister.code(), dest.disp() & 0x0000ffff);
+           masm.addu(addrTempRegister.code(), addrTempRegister.code(), dest.base());
+           masm.lui(immTempRegister.code(), (uint32_t)ptr.value >> 16);
+           masm.ori(immTempRegister.code(), immTempRegister.code(), (uint32_t)ptr.value & 0x0000ffff);
+           writeDataRelocation(ptr);
+           masm.sw(immTempRegister.code(), addrTempRegister.code(), 0);
+           break;
           case Operand::MEM_SCALE:
-//ok            masm.movl_i32m(ptr.value, dest.disp(), dest.base(), dest.index(), dest.scale());
-            mcss.store32(mTrustedImm32(ptr.value), mBaseIndex(dest.base(), dest.index(), mScale(dest.scale()), dest.disp()));
-            writeDataRelocation(ptr);
+//ok         masm.movl_i32m(ptr.value, dest.disp(), dest.base(), dest.index(), dest.scale());
+//           mcss.store32(mTrustedImm32(ptr.value), mBaseIndex(dest.base(), dest.index(), mScale(dest.scale()), dest.disp()));
+//           writeDataRelocation(ptr);
+           /* 
+            * author: wangqing
+            * date:2013-10-26
+            *
+               sll     addrTemp, dest.index, dest.scale
+               addu    addrTemp, addrTemp, dest.base
+               lui     immTemp, dest.offset >> 16
+               ori     immTemp, immTemp, dest.offset & 0x0000ffff
+               addu    addrTemp, addrTemp, immTemp
+               lui     immTemp, ptr.value >> 16
+               ori     immTemp, immTemp, ptr.value & 0x0000ffff
+               writeDataRelocation(ptr)
+               sw      immTemp, (0)(addrTemp)
+           */
+           masm.sll(addrTempRegister.code(), dest.index(), dest.scale());
+           masm.addu(addrTempRegister.code(), addrTempRegister.code(), dest.base());
+           masm.lui(immTempRegister.code(), dest.disp() >> 16);
+           masm.ori(immTempRegister.code(), immTempRegister.code(), dest.disp() & 0x0000ffff);
+           masm.addu(addrTempRegister.code(), addrTempRegister.code(),immTempRegister.code());
+           masm.lui(immTempRegister.code(), (uint32_t)ptr.value >> 16);
+           masm.ori(immTempRegister.code(), immTempRegister.code(), (uint32_t)ptr.value & 0x0000ffff);
+           writeDataRelocation(ptr);
+           masm.sw(immTempRegister.code(), addrTempRegister.code(), 0);
             break;
-          default:
-            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
-        }
+           default:
+            JS_NOT_REACHED("unexpected operand kind");        }
     }
     void movl(ImmWord imm, Register dest) {
     	//ok        masm.movl_i32r(imm.value, dest.code());
@@ -745,7 +825,17 @@ class Assembler
 
     void cmpl(const Register src, ImmGCPtr ptr) {
         movl(src,cmpTempRegister);
-        movl(ptr,cmpTemp2Register);
+        //movl(ptr,cmpTemp2Register);
+        /* 
+         * author: wangqing
+         * date: 2013-10-26
+         *
+         * lui cmpTemp2, ptr.value >> 16
+         * ori cmpTemp2, cmpTemp2, ptr.value & 0x0000ffff
+         * writDateRelocation(ptr)
+         */
+        masm.lui(cmpTemp2Register.code(), (uint32_t)ptr.value >> 16);
+        masm.ori(cmpTemp2Register.code(), cmpTemp2Register.code(), (uint32_t)ptr.value & 0x0000ffff);
         writeDataRelocation(ptr);
     }
     void cmpl(const Register &lhs, const Register &rhs) {
@@ -754,7 +844,18 @@ class Assembler
     }
     void cmpl(const Operand &op, ImmGCPtr imm) {
         movl(op,cmpTempRegister);
-        movl(imm,cmpTemp2Register);
+       // movl(imm,cmpTemp2Register);
+       // writeDataRelocation(imm);
+        /* 
+         * author: wangqing
+         * date: 2013-10-26
+         *
+         * lui cmpTemp2, imm.value >> 16
+         * ori cmpTemp2, cmpTemp2, imm.value & 0x0000ffff
+         * writDateRelocation(imm)
+         */
+        masm.lui(cmpTemp2Register.code(), (uint32_t)imm.value >> 16);
+        masm.ori(cmpTemp2Register.code(), cmpTemp2Register.code(), (uint32_t)imm.value & 0x0000ffff);
         writeDataRelocation(imm);
     }
     // New function
