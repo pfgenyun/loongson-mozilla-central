@@ -314,6 +314,12 @@ public:
         emitInst(0x0000001a | (rs << OP_SH_RS) | (rt << OP_SH_RT));
     }
 
+    // add by wangqing, 2013-12-24
+    void divu(RegisterID rs, RegisterID rt)
+    {
+        emitInst(0x0000001b | (rs << OP_SH_RS) | (rt << OP_SH_RT));
+    }
+
     void mfhi(RegisterID rd)
     {
         emitInst(0x00000010 | (rd << OP_SH_RD));
@@ -758,6 +764,13 @@ public:
     void ceqd(FPRegisterID fs, FPRegisterID ft)
     {
         emitInst(0x46200032 | (fs << OP_SH_FS) | (ft << OP_SH_FT));
+        copDelayNop();
+    }
+
+        //by weizhenwei, 2013.10.29
+    void cseqd(FPRegisterID fs, FPRegisterID ft)
+    {
+        emitInst(0x4620003a | (fs << OP_SH_FS) | (ft << OP_SH_FT));
         copDelayNop();
     }
 

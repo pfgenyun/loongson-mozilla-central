@@ -2671,6 +2671,484 @@ class Assembler
         *ptr = enabled ? 0xE8 : 0x3D;*/
             ASSERT(0);
     }
+
+    void movz(const Register &rd, const Register &rs, const Register &rt)
+    {
+        masm.movz(rd.code(), rs.code(), rt.code());
+    }
+
+    void move(const Register &rd, const Register &rs)
+    {
+        masm.move(rd.code(), rs.code());
+    }
+
+    /* Set an immediate value to a register.  This may generate 1 or 2
+       instructions.  */
+    void li(const Register &dest, ImmWord imm)
+    {
+        masm.li(dest.code(), imm.value);
+    }
+
+    void lui(const Register &rt, ImmWord imm)
+    {
+        masm.lui(rt.code(), imm.value);
+    }
+
+    void addiu(const Register &rt, const Register &rs, ImmWord imm)
+    {
+        masm.addiu(rt.code(), rs.code(), imm.value);
+    }
+
+    void addu(const Register &rd, const Register &rs, const Register &rt)
+    {
+        masm.addu(rd.code(), rs.code(), rt.code());
+    }
+
+    void subu(const Register &rd, const Register &rs, const Register &rt)
+    {
+        masm.subu(rd.code(), rs.code(), rt.code());
+    }
+
+    void mult(const Register &rs, const Register &rt)
+    {
+        masm.mult(rs.code(), rt.code());
+    }
+
+    void div(const Register &rs, const Register &rt)
+    {
+        masm.div(rs.code(), rt.code());
+    }
+
+    void divu(const Register &rs, const Register &rt)
+    {
+        masm.divu(rs.code(), rt.code());
+    }
+
+    void mfhi(const Register &rd)
+    {
+        masm.mfhi(rd.code());
+    }
+
+    void mflo(const Register &rd)
+    {
+        masm.mflo(rd.code());
+    }
+
+    void mul(const Register &rd, const Register &rs, const Register &rt)
+    {
+        masm.mul(rd.code(), rs.code(), rt.code());
+    }
+
+    void andInsn(const Register &rd, const Register &rs, const Register &rt)
+    {
+        masm.andInsn(rd.code(), rs.code(), rt.code());
+    }
+
+    void andi(const Register &rt, const Register &rs, ImmWord imm)
+    {
+        masm.andi(rt.code(), rs.code(), imm.value);
+    }
+
+    void nor(const Register &rd, const Register &rs, const Register &rt)
+    {
+        masm.nor(rd.code(), rs.code(), rt.code());
+    }
+
+    void orInsn(const Register &rd, const Register &rs, const Register &rt)
+    {
+        masm.orInsn(rd.code(), rs.code(), rt.code());
+    }
+
+    void ori(const Register &rt, const Register &rs, ImmWord imm)
+    {
+        masm.ori(rt.code(), rs.code(), imm.value);
+    }
+
+    void xorInsn(const Register &rd, const Register &rs, const Register &rt)
+    {
+        masm.xorInsn(rd.code(), rs.code(), rt.code());
+    }
+
+    void xori(const Register &rt, const Register &rs, ImmWord imm)
+    {
+        masm.xori(rt.code(), rs.code(), imm.value);
+    }
+
+    void slt(const Register &rd, const Register &rs, const Register &rt)
+    {
+        masm.slt(rd.code(), rs.code(), rt.code());
+    }
+
+    void sltu(const Register &rd, const Register &rs, const Register &rt)
+    {
+        masm.sltu(rd.code(), rs.code(), rt.code());
+    }
+
+    void sltiu(const Register &rt, const Register &rs, ImmWord imm)
+    {
+        masm.sltiu(rt.code(), rs.code(), imm.value);
+    }
+
+    void sll(const Register &rd, const Register &rt, ImmWord shamt)
+    {
+        masm.sll(rd.code(), rt.code(), shamt.value);
+    }
+
+    void sllv(const Register &rd, const Register &rt, ImmWord rs)
+    {
+        masm.sllv(rd.code(), rt.code(), rs.value);
+    }
+
+    void sra(const Register &rd, const Register &rt, ImmWord shamt)
+    {
+        masm.sra(rd.code(), rt.code(), shamt.value);
+    }
+
+    void srav(const Register &rd, const Register &rt, const Register &rs)
+    {
+        masm.srav(rd.code(), rt.code(), rs.code());
+    }
+
+    void srl(const Register &rd, const Register &rt, ImmWord shamt)
+    {
+        masm.srl(rd.code(), rt.code(), shamt.value);
+    }
+
+    void srlv(const Register &rd, const Register &rt, const Register &rs)
+    {
+        masm.srlv(rd.code(), rt.code(), rs.code());
+    }
+
+    void lb(const Register &rt, const Register &rs, ImmWord offset)
+    {
+        masm.lb(rt.code(), rs.code(), offset.value);
+    }
+
+    void lbu(const Register &rt, const Register &rs, ImmWord offset)
+    {
+        masm.lbu(rt.code(), rs.code(), offset.value);
+    }
+
+    void lw(const Register &rt, const Register &rs, ImmWord offset)
+    {
+        masm.lw(rt.code(), rs.code(), offset.value);
+    }
+
+    void lwl(const Register &rt, const Register &rs, ImmWord offset)
+    {
+        masm.lwl(rt.code(), rs.code(), offset.value);
+    }
+
+    void lwr(const Register &rt, const Register &rs, ImmWord offset)
+    {
+        masm.lwr(rt.code(), rs.code(), offset.value);
+    }
+
+    void lh(const Register &rt, const Register &rs, ImmWord offset)
+    {
+        masm.lh(rt.code(), rs.code(), offset.value);
+    }
+
+    void lhu(const Register &rt, const Register &rs, ImmWord offset)
+    {
+        masm.lhu(rt.code(), rs.code(), offset.value);
+    }
+
+    void sb(const Register &rt, const Register &rs, ImmWord offset)
+    {
+        masm.sb(rt.code(), rs.code(), offset.value);
+    }
+
+    void sh(const Register &rt, const Register &rs, ImmWord offset)
+    {
+        masm.sh(rt.code(), rs.code(), offset.value);
+    }
+
+    void sw(const Register &rt, const Register &rs, ImmWord offset)
+    {
+        masm.sw(rt.code(), rs.code(), offset.value);
+    }
+
+    void jr(const Register &rs)
+    {
+        masm.jr(rs.code());
+    }
+
+    void jalr(const Register &rs)
+    {
+        masm.jalr(rs.code());
+    }
+
+    void jal()
+    {
+        masm.jal();
+    }
+
+    void bkpt()
+    {
+        masm.bkpt();
+    }
+
+    void bal(ImmWord imm)
+    {
+        masm.bal(imm.value);
+    }
+
+    void bgez(const Register &rs, ImmWord imm)
+    {
+        masm.bgez(rs.code(), imm.value);
+    }
+
+    void bltz(const Register &rs, ImmWord imm)
+    {
+        masm.bltz(rs.code(), imm.value);
+    }
+
+    void beq(const Register &rs, const Register &rt, ImmWord imm)
+    {
+        masm.beq(rs.code(), rt.code(), imm.value);
+    }
+
+    void bne(const Register &rs, const Register &rt, ImmWord imm)
+    {
+        masm.bne(rs.code(), rt.code(), imm.value);
+    }
+
+    void bc1t()
+    {
+        masm.bc1t();
+    }
+
+    void bc1f()
+    {
+        masm.bc1f();
+    }
+
+    // by wangqing 2010-10-30
+    JmpSrc newJmpSrc()
+    {
+        JSC::AssemblerBuffer m_buffer;
+        return JSC::MIPSAssembler::JmpSrc(m_buffer.size());
+    }
+
+    void appendJump()
+    {
+        masm.appendJump();
+    }
+
+    void movd(const FloatRegister &fd, const FloatRegister &fs)
+    {
+        masm.movd(fd.code(), fs.code());
+    }
+
+    void addd(const FloatRegister &fd, const FloatRegister &fs, const FloatRegister &ft)
+    {
+        masm.addd(fd.code(), fs.code(), ft.code());
+    }
+
+    // add by wangqing
+    void adds(const FloatRegister &fd, const FloatRegister &fs, const FloatRegister &ft)
+    {
+        masm.adds(fd.code(), fs.code(), ft.code());
+    }
+
+    void subd(const FloatRegister &fd, const FloatRegister &fs, const FloatRegister &ft)
+    {
+        masm.subd(fd.code(), fs.code(), ft.code());
+    }
+
+    // add by wangqing
+    void subs(const FloatRegister &fd, const FloatRegister &fs, const FloatRegister &ft)
+    {
+        masm.subs(fd.code(), fs.code(), ft.code());
+    }
+
+    void muld(const FloatRegister &fd, const FloatRegister &fs, const FloatRegister &ft)
+    {
+        masm.muld(fd.code(), fs.code(), ft.code());
+    }
+
+    // add by wangqing
+    void muls(const FloatRegister &fd, const FloatRegister &fs, const FloatRegister &ft)
+    {
+        masm.muls(fd.code(), fs.code(), ft.code());
+    }
+
+    void divd(const FloatRegister &fd, const FloatRegister &fs, const FloatRegister &ft)
+    {
+        masm.divd(fd.code(), fs.code(), ft.code());
+    }
+
+    // add by wangqing
+    void divs(const FloatRegister &fd, const FloatRegister &fs, const FloatRegister &ft)
+    {
+        masm.divs(fd.code(), fs.code(), ft.code());
+    }
+    
+    void lwc1(const FloatRegister &ft, const Register &rs, ImmWord offset)
+    {
+        masm.lwc1(ft.code(), rs.code(), offset.value);
+    }
+
+    void ldc1(const FloatRegister &ft, const Register &rs, ImmWord offset)
+    {
+        masm.ldc1(ft.code(), rs.code(), offset.value);
+    }
+
+    void swc1(const FloatRegister &ft, const Register &rs, ImmWord offset)
+    {
+        masm.swc1(ft.code(), rs.code(), offset.value);
+    }
+
+    void sdc1(const FloatRegister &ft, const Register &rs, ImmWord offset)
+    {
+        masm.sdc1(ft.code(), rs.code(), offset.value);
+    }
+
+    void mtc1(const Register &rt, const FloatRegister &fs)
+    {
+        masm.mtc1(rt.code(), fs.code());
+    }
+
+    void mthc1(const Register &rt, const FloatRegister &fs)
+    {
+        masm.mthc1(rt.code(), fs.code());
+    }
+
+    void dsrl32(const Register &rt, const Register &rd, ImmWord saminus32)
+    {
+        masm.dsrl32(rt.code(), rd.code(), saminus32.value);
+    }
+
+    void dmfc1(const Register &rt, const FloatRegister &fs)
+    {
+        masm.dmfc1(rt.code(), fs.code());
+    }
+
+    void mfc1(const Register &rt, const FloatRegister &fs)
+    {
+        masm.mfc1(rt.code(), fs.code());
+    }
+
+    void sqrtd(const FloatRegister &fd, const FloatRegister &fs)
+    {
+        masm.sqrtd(fd.code(), fs.code());
+    }
+
+    // add by wangqing
+    void sqrts(const FloatRegister &fd, const FloatRegister &fs)
+    {
+        masm.sqrts(fd.code(), fs.code());
+    }
+
+    void truncwd(const FloatRegister &fd, const FloatRegister &fs)
+    {
+        masm.truncwd(fd.code(), fs.code());
+    }
+
+    // add by wangqing
+    void truncws(const FloatRegister &fd, const FloatRegister &fs)
+    {
+        masm.truncws(fd.code(), fs.code());
+    }
+
+    void floorwd(const FloatRegister &fd, const FloatRegister &fs)
+    {
+        masm.floorwd(fd.code(), fs.code());
+    }
+
+    // add by wangqing
+    void floorws(const FloatRegister &fd, const FloatRegister &fs)
+    {
+        masm.floorws(fd.code(), fs.code());
+    }
+
+    void cvtdw(const FloatRegister &fd, const FloatRegister &fs)
+    {
+        masm.cvtdw(fd.code(), fs.code());
+    }
+
+    // add by wangqing
+    void cvtsw(const FloatRegister &fd, const FloatRegister &fs)
+    {
+        masm.cvtsw(fd.code(), fs.code());
+    }
+
+    void cvtds(const FloatRegister &fd, const FloatRegister &fs)
+    {
+        masm.cvtds(fd.code(), fs.code());
+    }
+
+    void cvtsd(const FloatRegister &fd, const FloatRegister &fs)
+    {
+        masm.cvtsd(fd.code(), fs.code());
+    }
+
+    void cvtwd(const FloatRegister &fd, const FloatRegister &fs)
+    {
+        masm.cvtwd(fd.code(), fs.code());
+    }
+
+    void cud(const FloatRegister &fs, const FloatRegister &ft)
+    {
+        masm.cud(fs.code(), ft.code());
+    }
+
+    void ceqd(const FloatRegister &fs, const FloatRegister &ft)
+    {
+        masm.ceqd(fs.code(), ft.code());
+    }
+
+    void cseqd(const FloatRegister &fs, const FloatRegister &ft)
+    {
+        masm.cseqd(fs.code(), ft.code());
+    }
+
+    void cngtd(const FloatRegister &fs, const FloatRegister &ft)
+    {
+        masm.cngtd(fs.code(), ft.code());
+    }
+
+    void cnged(const FloatRegister &fs, const FloatRegister &ft)
+    {
+        masm.cnged(fs.code(), ft.code());
+    }
+
+    void cltd(const FloatRegister &fs, const FloatRegister &ft)
+    {
+        masm.cltd(fs.code(), ft.code());
+    }
+
+    void cled(const FloatRegister &fs, const FloatRegister &ft)
+    {
+        masm.cled(fs.code(), ft.code());
+    }
+
+    void cueqd(const FloatRegister &fs, const FloatRegister &ft)
+    {
+        masm.cueqd(fs.code(), ft.code());
+    }
+
+    void coled(const FloatRegister &fs, const FloatRegister &ft)
+    {
+        masm.coled(fs.code(), ft.code());
+    }
+
+    void coltd(const FloatRegister &fs, const FloatRegister &ft)
+    {
+        masm.coltd(fs.code(), ft.code());
+    }
+
+    void culed(const FloatRegister &fs, const FloatRegister &ft)
+    {
+        masm.culed(fs.code(), ft.code());
+    }
+
+    void cultd(const FloatRegister &fs, const FloatRegister &ft)
+    {
+        masm.cultd(fs.code(), ft.code());
+    }
+
 };
 
 // Get a register in which we plan to put a quantity that will be used as an
