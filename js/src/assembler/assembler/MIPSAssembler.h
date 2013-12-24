@@ -407,7 +407,8 @@ public:
                  | ((shamt & 0x1f) << OP_SH_SHAMT));
     }
 
-    void sllv(RegisterID rd, RegisterID rt, int rs)
+    // by wangqing, 2013-11-06, modify rs from int to RegisterID
+    void sllv(RegisterID rd, RegisterID rt, RegisterID rs)
     {
         emitInst(0x00000004 | (rd << OP_SH_RD) | (rt << OP_SH_RT)
                  | (rs << OP_SH_RS));
