@@ -573,11 +573,11 @@ class Assembler
          * addiu sp, sp, -4
          * sw immTemp, sp, 0
          */
-        masm.lui(immTempRegister.code(), (uint32_t)ptr.value >> 16);
-        masm.ori(immTempRegister.code(), immTempRegister.code(), (uint32_t)ptr.value & 0x0000ffff);
+        lui(immTempRegister, (uint32_t)ptr.value >> 16);
+        ori(immTempRegister, immTempRegister, (uint32_t)ptr.value & 0x0000ffff);
         writeDataRelocation(ptr);
-        masm.addiu(JSC::MIPSRegisters::sp, JSC::MIPSRegisters::sp, -4);
-        masm.sw(immTempRegister.code(), JSC::MIPSRegisters::sp, 0);
+        addiu(sp, sp, -4);
+        sw(immTempRegister, sp, 0);
     }
     void push(const ImmWord imm) {
         push(Imm32(imm.value));
@@ -604,10 +604,10 @@ class Assembler
         *
         */
         CodeOffsetLabel label = CodeOffsetLabel(size());
-        masm.lui(immTempRegister.code(), word.value >> 16);
-        masm.ori(immTempRegister.code(), immTempRegister.code(), word.value & 0x0000ffff);
-        masm.addiu(JSC::MIPSRegisters::sp, JSC::MIPSRegisters::sp, -4);
-        masm.sw(immTempRegister.code(), JSC::MIPSRegisters::sp, 0);
+        lui(immTempRegister, word.value >> 16);
+        ori(immTempRegister, immTempRegister, word.value & 0x0000ffff);
+        addiu(sp, sp, -4);
+        sw(immTempRegister, sp, 0);
         return label;
     }
 
@@ -627,8 +627,8 @@ class Assembler
          * ori dest.code(), dest.code(), word.value & 0x0000ffff
          */
         CodeOffsetLabel label = CodeOffsetLabel(size());
-        masm.lui(dest.code(), word.value >> 16);
-        masm.ori(dest.code(), dest.code(), word.value & 0x0000ffff);
+        lui(dest, word.value >> 16);
+        ori(dest, dest, word.value & 0x0000ffff);
         return label;
 
     }
@@ -655,8 +655,8 @@ class Assembler
         * ori dest, dest, ptr.value & 0x0000ffff
         * writDateRelocation(ptr)
         */
-        masm.lui(dest.code(), (uint32_t)ptr.value >> 16);
-        masm.ori(dest.code(), dest.code(), (uint32_t)ptr.value & 0x0000ffff);
+        lui(dest, (uint32_t)ptr.value >> 16);
+        ori(dest, dest, (uint32_t)ptr.value & 0x0000ffff);
         writeDataRelocation(ptr);
     }
     void movl(const ImmGCPtr &ptr, const Operand &dest) {
@@ -674,8 +674,8 @@ class Assembler
             * ori dest, dest, ptr.value & 0x0000ffff
             * writeDataRelocation(ptr);
             */
-           masm.lui(dest.reg(), (uint32_t)ptr.value >> 16);
-           masm.ori(dest.reg(), dest.reg(), (uint32_t)ptr.value & 0x0000ffff);
+           lui(dest.reg(), (uint32_t)ptr.value >> 16);
+           ori(dest.reg(), dest.reg(), (uint32_t)ptr.value & 0x0000ffff);
            writeDataRelocation(ptr);
            break;
           case Operand::MEM_REG_DISP:
@@ -695,13 +695,13 @@ class Assembler
             * writeDataRelocation(ptr)
             * sw immTemp, addrTemp, 0
             */
-           masm.lui(addrTempRegister.code(), dest.disp() >> 16);
-           masm.ori(addrTempRegister.code(), addrTempRegister.code(), dest.disp() & 0x0000ffff);
-           masm.addu(addrTempRegister.code(), addrTempRegister.code(), dest.base());
-           masm.lui(immTempRegister.code(), (uint32_t)ptr.value >> 16);
-           masm.ori(immTempRegister.code(), immTempRegister.code(), (uint32_t)ptr.value & 0x0000ffff);
+           lui(addrTempRegister, dest.disp() >> 16);
+           ori(addrTempRegister, addrTempRegister, dest.disp() & 0x0000ffff);
+           addu(addrTempRegister, addrTempRegister, dest.base());
+           lui(immTempRegister, (uint32_t)ptr.value >> 16);
+           ori(immTempRegister, immTempRegister, (uint32_t)ptr.value & 0x0000ffff);
            writeDataRelocation(ptr);
-           masm.sw(immTempRegister.code(), addrTempRegister.code(), 0);
+           sw(immTempRegister, addrTempRegister, 0);
            break;
           case Operand::MEM_SCALE:
 //ok         masm.movl_i32m(ptr.value, dest.disp(), dest.base(), dest.index(), dest.scale());
@@ -721,15 +721,15 @@ class Assembler
                writeDataRelocation(ptr)
                sw      immTemp, (0)(addrTemp)
            */
-           masm.sll(addrTempRegister.code(), dest.index(), dest.scale());
-           masm.addu(addrTempRegister.code(), addrTempRegister.code(), dest.base());
-           masm.lui(immTempRegister.code(), dest.disp() >> 16);
-           masm.ori(immTempRegister.code(), immTempRegister.code(), dest.disp() & 0x0000ffff);
-           masm.addu(addrTempRegister.code(), addrTempRegister.code(),immTempRegister.code());
-           masm.lui(immTempRegister.code(), (uint32_t)ptr.value >> 16);
-           masm.ori(immTempRegister.code(), immTempRegister.code(), (uint32_t)ptr.value & 0x0000ffff);
+           sll(addrTempRegister, dest.index(), dest.scale());
+           addu(addrTempRegister, addrTempRegister, dest.base());
+           lui(immTempRegister, dest.disp() >> 16);
+           ori(immTempRegister, immTempRegister, dest.disp() & 0x0000ffff);
+           addu(addrTempRegister, addrTempRegister, immTempRegister.code());
+           lui(immTempRegister, (uint32_t)ptr.value >> 16);
+           ori(immTempRegister, immTempRegister, (uint32_t)ptr.value & 0x0000ffff);
            writeDataRelocation(ptr);
-           masm.sw(immTempRegister.code(), addrTempRegister.code(), 0);
+           sw(immTempRegister, addrTempRegister, 0);
             break;
            default:
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
@@ -835,8 +835,8 @@ class Assembler
          * ori cmpTemp2, cmpTemp2, ptr.value & 0x0000ffff
          * writDateRelocation(ptr)
          */
-        masm.lui(cmpTemp2Register.code(), (uint32_t)ptr.value >> 16);
-        masm.ori(cmpTemp2Register.code(), cmpTemp2Register.code(), (uint32_t)ptr.value & 0x0000ffff);
+        lui(cmpTemp2Register, (uint32_t)ptr.value >> 16);
+        ori(cmpTemp2Register, cmpTemp2Register, (uint32_t)ptr.value & 0x0000ffff);
         writeDataRelocation(ptr);
     }
     void cmpl(const Register &lhs, const Register &rhs) {
@@ -855,8 +855,8 @@ class Assembler
          * ori cmpTemp2, cmpTemp2, imm.value & 0x0000ffff
          * writDateRelocation(imm)
          */
-        masm.lui(cmpTemp2Register.code(), (uint32_t)imm.value >> 16);
-        masm.ori(cmpTemp2Register.code(), cmpTemp2Register.code(), (uint32_t)imm.value & 0x0000ffff);
+        lui(cmpTemp2Register, (uint32_t)imm.value >> 16);
+        ori(cmpTemp2Register, cmpTemp2Register, (uint32_t)imm.value & 0x0000ffff);
         writeDataRelocation(imm);
     }
     // New function
@@ -879,10 +879,10 @@ class Assembler
         * lui cmpTemp2.code(), rhs.value >> 16
         * ori cmpTemp2.code(), cmpTemp2.code(), rhs.value & 0x0000ffff
         */
-       masm.move(lhs.code(),cmpTempRegister.code());
+       move(lhs,cmpTempRegister);
        CodeOffsetLabel label = CodeOffsetLabel(size());
-       masm.lui(cmpTemp2Register.code(), rhs.value >> 16);
-       masm.ori(cmpTemp2Register.code(), cmpTemp2Register.code(), rhs.value & 0x0000ffff);
+       lui(cmpTemp2Register, rhs.value >> 16);
+       ori(cmpTemp2Register, cmpTemp2Register, rhs.value & 0x0000ffff);
        return label; 
     }
 
@@ -995,8 +995,8 @@ class Assembler
          * ori dest.code(), dest.code(), imm.value&0x0000ffff
          */
         CodeOffsetLabel label = CodeOffsetLabel(size());
-        masm.lui(dest.code(), imm.value >> 16);
-        masm.ori(dest.code(), dest.code(), imm.value & 0x0000ffff);
+        lui(dest, imm.value >> 16);
+        ori(dest, dest, imm.value & 0x0000ffff);
         return label;
     }
 
@@ -1015,9 +1015,9 @@ class Assembler
          * lw dest.code(), addrTemp.code(), 0
          */
         CodeOffsetLabel label = CodeOffsetLabel(size());
-        masm.lui(addrTempRegister.code(), (int)addr >> 16);
-        masm.ori(addrTempRegister.code(), addrTempRegister.code(), (int)addr & 0x0000ffff);
-        masm.lw(dest.code(), addrTempRegister.code(), 0);
+        lui(addrTempRegister, (int)addr >> 16);
+        ori(addrTempRegister, addrTempRegister, (int)addr & 0x0000ffff);
+        lw(dest, addrTempRegister, 0);
         return label;
     }
     CodeOffsetLabel movsdWithPatch(void *addr, FloatRegister dest) {
@@ -1035,10 +1035,10 @@ class Assembler
          * lwc1 dest+1, addrTemp, 4
          */
         CodeOffsetLabel label = CodeOffsetLabel(size());
-        masm.lui(addrTempRegister.code(), (int)addr >> 16);
-        masm.ori(addrTempRegister.code(), addrTempRegister.code(), (int)addr & 0x0000ffff);  
-        masm.lwc1(dest.code(), addrTempRegister.code(), 0);
-        masm.lwc1(mFPRegisterID(dest.code()+1), addrTempRegister.code(), 4);
+        lui(addrTempRegister, (int)addr >> 16);
+        ori(addrTempRegister, addrTempRegister, (int)addr & 0x0000ffff);  
+        lwc1(dest, addrTempRegister, 0);
+        lwc1(mFPRegisterID(dest.code()+1), addrTempRegister, 4);
         return label;
     }
 
@@ -1057,9 +1057,9 @@ class Assembler
          */
         
         CodeOffsetLabel label = CodeOffsetLabel(size());
-        masm.lui(addrTempRegister.code(), (int)addr >> 16);
-        masm.ori(addrTempRegister.code(), addrTempRegister.code(), (int)addr & 0x0000ffff);
-        masm.sw(src.code(), addrTempRegister.code(), 0);
+        lui(addrTempRegister, (int)addr >> 16);
+        ori(addrTempRegister, addrTempRegister, (int)addr & 0x0000ffff);
+        sw(src, addrTempRegister, 0);
         return label;
     }
 
@@ -1080,10 +1080,10 @@ class Assembler
          */
         
         CodeOffsetLabel label = CodeOffsetLabel(size());
-        masm.lui(addrTempRegister.code(), (int)addr >> 16);
-        masm.ori(addrTempRegister.code(), addrTempRegister.code(), (int)addr & 0x0000ffff);  
-        masm.swc1(dest.code(), addrTempRegister.code(), 0);
-        masm.swc1(mFPRegisterID(dest.code()+1), addrTempRegister.code(), 4);
+        lui(addrTempRegister, (int)addr >> 16);
+        ori(addrTempRegister, addrTempRegister, (int)addr & 0x0000ffff);  
+        swc1(dest, addrTempRegister, 0);
+        swc1(mFPRegisterID(dest.code()+1), addrTempRegister, 4);
         return label;
     }
 
@@ -1103,10 +1103,10 @@ class Assembler
              lb      dest, (0)(addrTemp)
          */
          CodeOffsetLabel label = CodeOffsetLabel(size());
-         masm.lui(addrTempRegister.code(), src.offset >> 16);
-         masm.ori(addrTempRegister.code(), addrTempRegister.code(), src.offset & 0x0000ffff);
-         masm.addu(addrTempRegister.code(), addrTempRegister.code(), src.base.code());
-         masm.lb(dest.code(), addrTempRegister.code(), 0);
+         lui(addrTempRegister, src.offset >> 16);
+         ori(addrTempRegister, addrTempRegister, src.offset & 0x0000ffff);
+         addu(addrTempRegister, addrTempRegister, src.base.code());
+         lb(dest, addrTempRegister, 0);
          return label;
     }
     CodeOffsetLabel movzblWithPatch(Address src, Register dest) {
@@ -1125,10 +1125,10 @@ class Assembler
              lbu     dest, (0)(addrTemp)
          */
          CodeOffsetLabel label = CodeOffsetLabel(size());
-         masm.lui(addrTempRegister.code(), src.offset >> 16);
-         masm.ori(addrTempRegister.code(), addrTempRegister.code(), src.offset & 0x0000ffff);
-         masm.addu(addrTempRegister.code(), addrTempRegister.code(), src.base.code());
-         masm.lbu(dest.code(), addrTempRegister.code(), 0);
+         lui(addrTempRegister, src.offset >> 16);
+         ori(addrTempRegister, addrTempRegister, src.offset & 0x0000ffff);
+         addu(addrTempRegister, addrTempRegister, src.base);
+         lbu(dest, addrTempRegister, 0);
          return label;
     }
 
@@ -1148,10 +1148,10 @@ class Assembler
              lh      dest, (0)(addrTemp)
          */
          CodeOffsetLabel label = CodeOffsetLabel(size());
-         masm.lui(addrTempRegister.code(), src.offset >> 16);
-         masm.ori(addrTempRegister.code(), addrTempRegister.code(), src.offset & 0x0000ffff);
-         masm.addu(addrTempRegister.code(), addrTempRegister.code(), src.base.code());
-         masm.lh(dest.code(), addrTempRegister.code(), 0);
+         lui(addrTempRegister, src.offset >> 16);
+         ori(addrTempRegister, addrTempRegister, src.offset & 0x0000ffff);
+         addu(addrTempRegister, addrTempRegister, src.base);
+         lh(dest, addrTempRegister, 0);
          return label;
     }
 
@@ -1171,10 +1171,10 @@ class Assembler
              lhu     dest, (0)(addrTemp)
          */
          CodeOffsetLabel label = CodeOffsetLabel(size());
-         masm.lui(addrTempRegister.code(), src.offset >> 16);
-         masm.ori(addrTempRegister.code(), addrTempRegister.code(), src.offset & 0x0000ffff);
-         masm.addu(addrTempRegister.code(), addrTempRegister.code(), src.base.code());
-         masm.lhu(dest.code(), addrTempRegister.code(), 0);
+         lui(addrTempRegister, src.offset >> 16);
+         ori(addrTempRegister, addrTempRegister, src.offset & 0x0000ffff);
+         addu(addrTempRegister, addrTempRegister, src.base);
+         lhu(dest, addrTempRegister, 0);
          return label;
     }
 
@@ -1193,10 +1193,10 @@ class Assembler
              lw      dest, (0)(addrTemp)
          */
          CodeOffsetLabel label = CodeOffsetLabel(size());
-         masm.lui(addrTempRegister.code(), src.offset >> 16);
-         masm.ori(addrTempRegister.code(), addrTempRegister.code(), src.offset & 0x0000ffff);
-         masm.addu(addrTempRegister.code(), addrTempRegister.code(), src.base.code());
-         masm.lw(dest.code(), addrTempRegister.code(), 0);
+         lui(addrTempRegister, src.offset >> 16);
+         ori(addrTempRegister, addrTempRegister, src.offset & 0x0000ffff);
+         addu(addrTempRegister, addrTempRegister, src.base);
+         lw(dest, addrTempRegister, 0);
          return label;
     }
 
@@ -1217,11 +1217,11 @@ class Assembler
             cvt.d.s dest, dest
         */
          CodeOffsetLabel label = CodeOffsetLabel(size());
-         masm.lui(addrTempRegister.code(), src.offset >> 16);
-         masm.ori(addrTempRegister.code(), addrTempRegister.code(), src.offset & 0x0000ffff);
-         masm.addu(addrTempRegister.code(), addrTempRegister.code(), src.base.code());
-         masm.lwc1(dest.code(), addrTempRegister.code(), 0);
-         masm.cvtds(dest.code(), dest.code());
+         lui(addrTempRegister, src.offset >> 16);
+         ori(addrTempRegister, addrTempRegister, src.offset & 0x0000ffff);
+         addu(addrTempRegister, addrTempRegister, src.base);
+         lwc1(dest, addrTempRegister, 0);
+         cvtds(dest, dest);
          return label;
     }
 
@@ -1243,11 +1243,11 @@ class Assembler
          */
           
          CodeOffsetLabel label = CodeOffsetLabel(size());
-         masm.lui(addrTempRegister.code(), src.offset >> 16);
-         masm.ori(addrTempRegister.code(), addrTempRegister.code(), src.offset & 0x0000ffff);
-         masm.addu(addrTempRegister.code(), addrTempRegister.code(), src.base.code());
-         masm.lwc1(dest.code(), addrTempRegister.code(), 0);
-         masm.lwc1(mFPRegisterID(dest.code() + 1), addrTempRegister.code(), 4);
+         lui(addrTempRegister, src.offset >> 16);
+         ori(addrTempRegister, addrTempRegister, src.offset & 0x0000ffff);
+         addu(addrTempRegister, addrTempRegister, src.base);
+         lwc1(dest, addrTempRegister, 0);
+         lwc1(mFPRegisterID(dest.code() + 1), addrTempRegister, 4);
          return label;
     }
 
@@ -1267,10 +1267,10 @@ class Assembler
              sb      src, (0)(addrTemp)
          */   
          CodeOffsetLabel label = CodeOffsetLabel(size());
-         masm.lui(addrTempRegister.code(), dest.offset >> 16);
-         masm.ori(addrTempRegister.code(), addrTempRegister.code(), dest.offset & 0x0000ffff);
-         masm.addu(addrTempRegister.code(), addrTempRegister.code(), dest.base.code());
-         masm.sb(src.code(), addrTempRegister.code(), 0);
+         lui(addrTempRegister, dest.offset >> 16);
+         ori(addrTempRegister, addrTempRegister, dest.offset & 0x0000ffff);
+         addu(addrTempRegister, addrTempRegister, dest.base);
+         sb(src, addrTempRegister, 0);
          return label;
     }
 
@@ -1289,10 +1289,10 @@ class Assembler
               sh      src, (0)(addrTemp)
          */  
          CodeOffsetLabel label = CodeOffsetLabel(size());
-         masm.lui(addrTempRegister.code(), dest.offset >> 16);
-         masm.ori(addrTempRegister.code(), addrTempRegister.code(), dest.offset & 0x0000ffff);
-         masm.addu(addrTempRegister.code(), addrTempRegister.code(), dest.base.code());
-         masm.sh(src.code(), addrTempRegister.code(), 0);
+         lui(addrTempRegister, dest.offset >> 16);
+         ori(addrTempRegister, addrTempRegister, dest.offset & 0x0000ffff);
+         addu(addrTempRegister, addrTempRegister, dest.base);
+         sh(src, addrTempRegister, 0);
          return label;
     }
 
@@ -1311,10 +1311,10 @@ class Assembler
              sw      src, addrTemp, 0
          */
          CodeOffsetLabel label = CodeOffsetLabel(size());
-         masm.lui(addrTempRegister.code(), dest.offset >> 16);
-         masm.ori(addrTempRegister.code(), addrTempRegister.code(), dest.offset & 0x0000ffff);
-         masm.addu(addrTempRegister.code(), addrTempRegister.code(), dest.base.code());
-         masm.sw(src.code(), addrTempRegister.code(), 0);
+         lui(addrTempRegister, dest.offset >> 16);
+         ori(addrTempRegister, addrTempRegister, dest.offset & 0x0000ffff);
+         addu(addrTempRegister, addrTempRegister, dest.base);
+         sw(src, addrTempRegister, 0);
          return label;
     }
 
@@ -1334,10 +1334,10 @@ class Assembler
               swc1    src, addrTemp, 0
          */
          CodeOffsetLabel label = CodeOffsetLabel(size());
-         masm.lui(addrTempRegister.code(), dest.offset >> 16);
-         masm.ori(addrTempRegister.code(), addrTempRegister.code(), dest.offset & 0x0000ffff);
-         masm.addu(addrTempRegister.code(), addrTempRegister.code(), dest.base.code());
-         masm.swc1(src.code(), addrTempRegister.code(), 0);
+         lui(addrTempRegister, dest.offset >> 16);
+         ori(addrTempRegister, addrTempRegister, dest.offset & 0x0000ffff);
+         addu(addrTempRegister, addrTempRegister, dest.base);
+         swc1(src, addrTempRegister, 0);
          return label;
     }
 
@@ -1356,11 +1356,11 @@ class Assembler
             swc1        dest+1, 4(addrTemp)
          */
          CodeOffsetLabel label = CodeOffsetLabel(size());
-         masm.lui(addrTempRegister.code(), dest.offset >> 16);
-         masm.ori(addrTempRegister.code(), addrTempRegister.code(), dest.offset & 0x0000ffff);
-         masm.addu(addrTempRegister.code(), addrTempRegister.code(), dest.base.code());
-         masm.swc1(src.code(), addrTempRegister.code(), 0);
-         masm.swc1(mFPRegisterID(src.code() + 1), addrTempRegister.code(), 4);
+         lui(addrTempRegister, dest.offset >> 16);
+         ori(addrTempRegister, addrTempRegister, dest.offset & 0x0000ffff);
+         addu(addrTempRegister, addrTempRegister, dest.base);
+         swc1(src, addrTempRegister, 0);
+         swc1(mFPRegisterID(src.code() + 1), addrTempRegister, 4);
          return label;
     }
 
@@ -1385,12 +1385,12 @@ class Assembler
              addu    addrTemp, addrTemp, immTemp
              lw      dest, 0(addrTemp)
         */
-        masm.sll(addrTempRegister.code(), index.code(), (int)scale);
+        sll(addrTempRegister, index, (int)scale);
         CodeOffsetLabel label = CodeOffsetLabel(size());
-        masm.lui(immTempRegister.code(), (int)addr.addr >> 16);
-        masm.ori(immTempRegister.code(), immTempRegister.code(), (int)addr.addr & 0x0000ffff);
-        masm.addu(addrTempRegister.code(), addrTempRegister.code(), immTempRegister.code());
-        masm.lw(dest.code(), addrTempRegister.code(), 0);
+        lui(immTempRegister, (int)addr.addr >> 16);
+        ori(immTempRegister, immTempRegister, (int)addr.addr & 0x0000ffff);
+        addu(addrTempRegister, addrTempRegister, immTempRegister);
+        lw(dest, addrTempRegister, 0);
        return label;
     }
 
@@ -1410,9 +1410,9 @@ class Assembler
              lb      dest, (0)(addrTemp)
          */
          CodeOffsetLabel label = CodeOffsetLabel(size());
-         masm.lui(addrTempRegister.code(), (int)src.addr >> 16);
-         masm.ori(addrTempRegister.code(), addrTempRegister.code(), (int)src.addr & 0x0000ffff);
-         masm.lb(dest.code(), addrTempRegister.code(), 0);
+         lui(addrTempRegister, (int)src.addr >> 16);
+         ori(addrTempRegister, addrTempRegister, (int)src.addr & 0x0000ffff);
+         lb(dest, addrTempRegister, 0);
          return label;
 
     }
@@ -1432,9 +1432,9 @@ class Assembler
              lbu     dest, (0)(addrTemp)
          */
          CodeOffsetLabel label = CodeOffsetLabel(size());
-         masm.lui(addrTempRegister.code(), (int)src.addr >> 16);
-         masm.ori(addrTempRegister.code(), addrTempRegister.code(), (int)src.addr & 0x0000ffff);
-         masm.lbu(dest.code(), addrTempRegister.code(), 0);
+         lui(addrTempRegister, (int)src.addr >> 16);
+         ori(addrTempRegister, addrTempRegister, (int)src.addr & 0x0000ffff);
+         lbu(dest, addrTempRegister, 0);
          return label;
 
     }
@@ -1636,9 +1636,9 @@ class Assembler
              lh      dest, (0)(addrTemp)
          */
          CodeOffsetLabel label = CodeOffsetLabel(size());
-         masm.lui(addrTempRegister.code(), (int)src.addr >> 16);
-         masm.ori(addrTempRegister.code(), addrTempRegister.code(), (int)src.addr & 0x0000ffff);
-         masm.lh(dest.code(), addrTempRegister.code(), 0);
+         lui(addrTempRegister, (int)src.addr >> 16);
+         ori(addrTempRegister, addrTempRegister, (int)src.addr & 0x0000ffff);
+         lh(dest, addrTempRegister, 0);
          return label;
 
     }
@@ -1664,9 +1664,9 @@ class Assembler
              lhu     dest, (0)(addrTemp)
          */
          CodeOffsetLabel label = CodeOffsetLabel(size());
-         masm.lui(addrTempRegister.code(), (int)src.addr >> 16);
-         masm.ori(addrTempRegister.code(), addrTempRegister.code(), (int)src.addr & 0x0000ffff);
-         masm.lhu(dest.code(), addrTempRegister.code(), 0);
+         lui(addrTempRegister, (int)src.addr >> 16);
+         ori(addrTempRegister, addrTempRegister, (int)src.addr & 0x0000ffff);
+         lhu(dest, addrTempRegister, 0);
          return label;
     }
 
@@ -1702,9 +1702,9 @@ class Assembler
          * lw dest.code(), addrTemp.code(), 0
          */
         CodeOffsetLabel label = CodeOffsetLabel(size());
-        masm.lui(addrTempRegister.code(), (int)src.addr >> 16);
-        masm.ori(addrTempRegister.code(), addrTempRegister.code(), (int)src.addr & 0x0000ffff);
-        masm.lw(dest.code(), addrTempRegister.code(), 0);
+        lui(addrTempRegister, (int)src.addr >> 16);
+        ori(addrTempRegister, addrTempRegister, (int)src.addr & 0x0000ffff);
+        lw(dest, addrTempRegister, 0);
         return label;
 
     }
@@ -1713,8 +1713,8 @@ class Assembler
         //JS_ASSERT(0);
         //JS_ASSERT(HasSSE2());
         //masm.movss_mr(src.addr, dest.code());
-        movss(Operand(src.addr), dest);
-        return masm.currentOffset();
+        //movss(Operand(src.addr), dest);
+        //return masm.currentOffset();
         /*
          * 
          * author: wangqing
@@ -1726,10 +1726,10 @@ class Assembler
             cvt.d.s dest, dest
         */
          CodeOffsetLabel label = CodeOffsetLabel(size());
-         masm.lui(addrTempRegister.code(), (int)src.addr >> 16);
-         masm.ori(addrTempRegister.code(), addrTempRegister.code(), (int)src.addr & 0x0000ffff);
-         masm.lwc1(dest.code(), addrTempRegister.code(), 0);
-         masm.cvtds(dest.code(), dest.code());
+         lui(addrTempRegister, (int)src.addr >> 16);
+         ori(addrTempRegister, addrTempRegister, (int)src.addr & 0x0000ffff);
+         lwc1(dest, addrTempRegister, 0);
+         cvtds(dest, dest);
          return label;
 
     }
@@ -1772,10 +1772,10 @@ class Assembler
          * lwc1 dest+1, addrTemp, 4
          */
         CodeOffsetLabel label = CodeOffsetLabel(size());
-        masm.lui(addrTempRegister.code(), (int)src.addr >> 16);
-        masm.ori(addrTempRegister.code(), addrTempRegister.code(), (int)src.addr & 0x0000ffff);  
-        masm.lwc1(dest.code(), addrTempRegister.code(), 0);
-        masm.lwc1(mFPRegisterID(dest.code()+1), addrTempRegister.code(), 4);
+        lui(addrTempRegister, (int)src.addr >> 16);
+        ori(addrTempRegister, addrTempRegister, (int)src.addr & 0x0000ffff);  
+        lwc1(dest, addrTempRegister, 0);
+        lwc1(mFPRegisterID(dest.code()+1), addrTempRegister, 4);
         return label;
 
     }
@@ -1859,9 +1859,9 @@ class Assembler
              sb      src, (0)(addrTemp)
          */   
          CodeOffsetLabel label = CodeOffsetLabel(size());
-         masm.lui(addrTempRegister.code(), (int)dest.addr >> 16);
-         masm.ori(addrTempRegister.code(), addrTempRegister.code(), (int)dest.addr & 0x0000ffff);
-         masm.sb(src.code(), addrTempRegister.code(), 0);
+         lui(addrTempRegister, (int)dest.addr >> 16);
+         ori(addrTempRegister, addrTempRegister, (int)dest.addr & 0x0000ffff);
+         sb(src, addrTempRegister, 0);
          return label;
     }
     void movzbl(const Operand &src, const Register &dest) {
@@ -1897,9 +1897,9 @@ class Assembler
               sh      src, (0)(addrTemp)
          */  
          CodeOffsetLabel label = CodeOffsetLabel(size());
-         masm.lui(addrTempRegister.code(), (int)dest.addr >> 16);
-         masm.ori(addrTempRegister.code(), addrTempRegister.code(), (int)dest.addr & 0x0000ffff);
-         masm.sh(src.code(), addrTempRegister.code(), 0);
+         lui(addrTempRegister, (int)dest.addr >> 16);
+         ori(addrTempRegister, addrTempRegister, (int)dest.addr & 0x0000ffff);
+         sh(src, addrTempRegister, 0);
          return label;
     }
 
@@ -1936,9 +1936,9 @@ class Assembler
          */
         
         CodeOffsetLabel label = CodeOffsetLabel(size());
-        masm.lui(addrTempRegister.code(), (int)dest.addr >> 16);
-        masm.ori(addrTempRegister.code(), addrTempRegister.code(), (int)dest.addr & 0x0000ffff);
-        masm.sw(src.code(), addrTempRegister.code(), 0);
+        lui(addrTempRegister, (int)dest.addr >> 16);
+        ori(addrTempRegister, addrTempRegister, (int)dest.addr & 0x0000ffff);
+        sw(src, addrTempRegister, 0);
         return label;
 
     }
@@ -1975,9 +1975,9 @@ class Assembler
               swc1    src, addrTemp, 0
          */
          CodeOffsetLabel label = CodeOffsetLabel(size());
-         masm.lui(addrTempRegister.code(), (int)dest.addr >> 16);
-         masm.ori(addrTempRegister.code(), addrTempRegister.code(), (int)dest.addr & 0x0000ffff);
-         masm.swc1(src.code(), addrTempRegister.code(), 0);
+         lui(addrTempRegister, (int)dest.addr >> 16);
+         ori(addrTempRegister, addrTempRegister, (int)dest.addr & 0x0000ffff);
+         swc1(src, addrTempRegister, 0);
          return label;
 
     }
@@ -1999,10 +1999,10 @@ class Assembler
          */
         
         CodeOffsetLabel label = CodeOffsetLabel(size());
-        masm.lui(addrTempRegister.code(), (int)dest.addr >> 16);
-        masm.ori(addrTempRegister.code(), addrTempRegister.code(), (int)dest.addr & 0x0000ffff);  
-        masm.swc1(src.code(), addrTempRegister.code(), 0);
-        masm.swc1(mFPRegisterID(src.code()+1), addrTempRegister.code(), 4);
+        lui(addrTempRegister, (int)dest.addr >> 16);
+        ori(addrTempRegister, addrTempRegister, (int)dest.addr & 0x0000ffff);  
+        swc1(src, addrTempRegister, 0);
+        swc1(mFPRegisterID(src.code()+1), addrTempRegister, 4);
         return label;
     }
 
@@ -3364,16 +3364,41 @@ class Assembler
     {
         masm.lui(rt.code(), imm.value);
     }
+       
+    // by wangqing, overloaded lui 
+    void lui(const Register &rt, int32_t imm)
+    {
+        masm.lui(rt.code(), imm);
+    }
+
+    // by wangqing, overloaded lui 
+    void lui(const mRegisterID rt, int32_t imm)
+    {
+        masm.lui(rt, imm);
+    }
 
     void addiu(const Register &rt, const Register &rs, ImmWord imm)
     {
         masm.addiu(rt.code(), rs.code(), imm.value);
     }
 
+    // by wangqing, overload addiu
+    void addiu(const Register &rt, const Register &rs, int32_t imm)
+    {
+        masm.addiu(rt.code(), rs.code(), imm);
+    }
+
     void addu(const Register &rd, const Register &rs, const Register &rt)
     {
         masm.addu(rd.code(), rs.code(), rt.code());
     }
+
+    //by wangqing, overloaded addu
+    void addu(const Register &rd, const Register &rs, const mRegisterID rt)
+    {
+        masm.addu(rd.code(), rs.code(), rt);
+    }
+
 
     void subu(const Register &rd, const Register &rs, const Register &rt)
     {
@@ -3435,6 +3460,18 @@ class Assembler
         masm.ori(rt.code(), rs.code(), imm.value);
     }
 
+    // by wangqing ,overloaded ori
+    void ori(const Register &rt, const Register &rs, int32_t imm)
+    {
+        masm.ori(rt.code(), rs.code(), imm);
+    }
+
+    // by wangqing ,overloaded ori
+    void ori(const mRegisterID rt, const mRegisterID rs, int32_t imm)
+    {
+        masm.ori(rt, rs, imm);
+    }
+
     void xorInsn(const Register &rd, const Register &rs, const Register &rt)
     {
         masm.xorInsn(rd.code(), rs.code(), rt.code());
@@ -3464,7 +3501,19 @@ class Assembler
     {
         masm.sll(rd.code(), rt.code(), shamt.value);
     }
-        
+
+    // by wangqing, overloaded sll
+    void sll(const Register &rd, const mRegisterID rt, int32_t shamt)
+    {
+        masm.sll(rd.code(), rt, shamt);
+    }
+    
+    // by wangqing, overloaded sll
+    void sll(const Register &rd, const Register &rt, int32_t shamt)
+    {
+        masm.sll(rd.code(), rt.code(), shamt);
+    }
+
     void sllv(const Register &rd, const Register &rt, const Register &rs)
     {
         masm.sllv(rd.code(), rt.code(), rs.code());
@@ -3495,14 +3544,32 @@ class Assembler
         masm.lb(rt.code(), rs.code(), offset.value);
     }
 
+    // by wangqing, overloaded lb
+    void lb(const Register &rt, const Register &rs, int32_t offset)
+    {
+        masm.lb(rt.code(), rs.code(), offset);
+    }
+
     void lbu(const Register &rt, const Register &rs, ImmWord offset)
     {
         masm.lbu(rt.code(), rs.code(), offset.value);
+    }
+    
+    // by wangqing, overloaded lbu
+    void lbu(const Register &rt, const Register &rs, int32_t offset)
+    {
+        masm.lbu(rt.code(), rs.code(), offset);
     }
 
     void lw(const Register &rt, const Register &rs, ImmWord offset)
     {
         masm.lw(rt.code(), rs.code(), offset.value);
+    }
+    
+    // by wangqing, overloaded lw
+    void lw(const Register &rt, const Register &rs, int32_t offset)
+    {
+        masm.lw(rt.code(), rs.code(), offset);
     }
 
     void lwl(const Register &rt, const Register &rs, ImmWord offset)
@@ -3520,9 +3587,21 @@ class Assembler
         masm.lh(rt.code(), rs.code(), offset.value);
     }
 
+    // by wangqing, overloaded lh
+    void lh(const Register &rt, const Register &rs, int32_t offset)
+    {
+        masm.lh(rt.code(), rs.code(), offset);
+    }
+
     void lhu(const Register &rt, const Register &rs, ImmWord offset)
     {
         masm.lhu(rt.code(), rs.code(), offset.value);
+    }
+
+    // by wangqing, overloaded lhu
+    void lhu(const Register &rt, const Register &rs, int32_t offset)
+    {
+        masm.lhu(rt.code(), rs.code(), offset);
     }
 
     void sb(const Register &rt, const Register &rs, ImmWord offset)
@@ -3530,14 +3609,32 @@ class Assembler
         masm.sb(rt.code(), rs.code(), offset.value);
     }
 
+    // by wangqing, overloaded sb
+    void sb(const Register &rt, const Register &rs, int32_t offset)
+    {
+        masm.sb(rt.code(), rs.code(), offset);
+    }
+
     void sh(const Register &rt, const Register &rs, ImmWord offset)
     {
         masm.sh(rt.code(), rs.code(), offset.value);
     }
 
+    // by wangqing, overloaded sh
+    void sh(const Register &rt, const Register &rs, int32_t offset)
+    {
+        masm.sh(rt.code(), rs.code(), offset);
+    }
+
     void sw(const Register &rt, const Register &rs, ImmWord offset)
     {
         masm.sw(rt.code(), rs.code(), offset.value);
+    }
+
+    // by wangqing, overloaded sw
+    void sw(const Register &rt, const Register &rs, int32_t offset)
+    {
+        masm.sw(rt.code(), rs.code(), offset);
     }
 
     void jr(const Register &rs)
@@ -3570,6 +3667,12 @@ class Assembler
         masm.bgez(rs.code(), imm.value);
     }
 
+    // by wangqing, overloaded bgez
+    void bgez(const Register &rs, int32_t imm)
+    {
+        masm.bgez(rs.code(), imm);
+    }
+
     void bltz(const Register &rs, ImmWord imm)
     {
         masm.bltz(rs.code(), imm.value);
@@ -3580,9 +3683,21 @@ class Assembler
         masm.beq(rs.code(), rt.code(), imm.value);
     }
 
+    // by wangqing, overloaded beq
+    void beq(const Register &rs, const Register &rt, int32_t imm)
+    {
+        masm.beq(rs.code(), rt.code(), imm);
+    }
+
     void bne(const Register &rs, const Register &rt, ImmWord imm)
     {
         masm.bne(rs.code(), rt.code(), imm.value);
+    }
+
+    // by wangqing, overloaded bne
+    void bne(const Register &rs, const Register &rt, int32_t imm)
+    {
+        masm.bne(rs.code(), rt.code(), imm);
     }
 
     void bc1t()
@@ -3661,6 +3776,18 @@ class Assembler
         masm.lwc1(ft.code(), rs.code(), offset.value);
     }
 
+    // by wangqing, overloaded lwc1
+    void lwc1(const FloatRegister &ft, const Register &rs, int32_t offset)
+    {
+        masm.lwc1(ft.code(), rs.code(), offset);
+    }
+
+    // by wangqing, overloaded lwc1
+    void lwc1(const mFPRegisterID ft, const Register &rs, int32_t offset)
+    {
+        masm.lwc1(ft, rs.code(), offset);
+    }
+
     void ldc1(const FloatRegister &ft, const Register &rs, ImmWord offset)
     {
         masm.ldc1(ft.code(), rs.code(), offset.value);
@@ -3669,6 +3796,18 @@ class Assembler
     void swc1(const FloatRegister &ft, const Register &rs, ImmWord offset)
     {
         masm.swc1(ft.code(), rs.code(), offset.value);
+    }
+
+    // by wangqing, overloaded swcl
+    void swc1(const FloatRegister &ft, const Register &rs, int32_t offset)
+    {
+        masm.swc1(ft.code(), rs.code(), offset);
+    }
+
+    // by wangqing, overloaded swcl
+    void swc1(const mFPRegisterID ft, const Register &rs, int32_t offset)
+    {
+        masm.swc1(ft, rs.code(), offset);
     }
 
     void sdc1(const FloatRegister &ft, const Register &rs, ImmWord offset)
@@ -3691,9 +3830,21 @@ class Assembler
         masm.dsrl32(rt.code(), rd.code(), saminus32.value);
     }
 
+    // by wangqing, overload dsrl32
+    void dsrl32(const Register &rt, const Register &rd, int32_t saminus32)
+    {
+        masm.dsrl32(rt.code(), rd.code(), saminus32);
+    }
+
     void dmfc1(const Register &rt, const FloatRegister &fs)
     {
         masm.dmfc1(rt.code(), fs.code());
+    }
+
+    // by wangqing, overloaded dmfc1
+    void dmfc1(const mRegisterID rt, const mFPRegisterID fs)
+    {
+        masm.dmfc1(rt, fs);
     }
 
     void mfc1(const Register &rt, const FloatRegister &fs)
@@ -3818,16 +3969,6 @@ class Assembler
     void cultd(const FloatRegister &fs, const FloatRegister &ft)
     {
         masm.cultd(fs.code(), ft.code());
-    }
-
-    void addiu(const Register &rt, const Register &rs, int32_t imm)
-    {
-        masm.addiu(rt.code(), rs.code(), imm);
-    }
-
-    void addu(const Register &rd, const Register &rs, const mRegisterID rt)
-    {
-        masm.addu(rd.code(), rs.code(), rt);
     }
 };
 
