@@ -462,6 +462,29 @@ class Assembler
         return static_cast<Condition>(cond & ~DoubleConditionBits);
     }
 
+    //by weizhenwei, 2013.12.24
+    static inline DoubleCondition DoubleConditionFromCondition(Condition cond) {
+		if ((cond == Equal) || (cond == Zero)) {
+				return DoubleEqual;
+		} else if ((cond == NotEqual) || (cond == NonZero)) {
+				return DoubleNotEqual;
+		} else if ((cond == Above) || (cond == GreaterThan)) {
+				return DoubleGreaterThan;
+		} else if ((cond == AboveOrEqual) || (cond == GreaterThanOrEqual)) {
+				return DoubleGreaterThanOrEqual;
+		} else if ((cond == Below) || (cond == LessThan)) {
+				return DoubleLessThan;
+		} else if ((cond == BelowOrEqual) || (cond == LessThanOrEqual)) {
+				return DoubleLessThanOrEqual;
+		} else if (cond == Parity) {
+				return DoubleUnordered;
+		} else if (cond == NoParity) {
+				return DoubleOrdered;
+		} else {
+				JS_ASSERT(0);
+		}
+    }
+
     static void TraceDataRelocations(JSTracer *trc, IonCode *code, CompactBufferReader &reader);
 
     // MacroAssemblers hold onto gcthings, so they are traced by the GC.
@@ -2107,12 +2130,15 @@ class Assembler
       //  masm.idivl_r(divisor.code());//in x86:idivl  signed
       //   mcss.div(t6.code(), divisor.code());
       //  mcss.mflo(divisor.code());
-        masm.div(t6.code(), divisor.code());
-        masm.mflo(divisor.code());
+        div(t6, divisor);
+        mfhi(t7);
+        mflo(t6);
     }
     void udiv(Register divisor) {
-       ASSERT(0);
       // masm.divl_r(divisor.code());// in x86:div unsigned
+      divu(t6, divisor);
+      mfhi(t7);
+      mflo(t6);
     }
 
     void unpcklps(const FloatRegister &src, const FloatRegister &dest) {
@@ -2797,6 +2823,10 @@ class Assembler
     {
         masm.sllv(rd.code(), rt.code(), rs.value);
     }
+    void sllv(const Register &rd, const Register &rt, const Register &rs)
+    {
+        masm.sllv(rd.code(), rt.code(), rs.code());
+    }
 
     void sra(const Register &rd, const Register &rt, ImmWord shamt)
     {
@@ -3146,6 +3176,15 @@ class Assembler
     void cultd(const FloatRegister &fs, const FloatRegister &ft)
     {
         masm.cultd(fs.code(), ft.code());
+    }
+
+    void addiu(const Register &rt, const Register &rs, int32_t imm)
+    {
+        masm.addiu(rt.code(), rs.code(), imm);
+    }
+    void addu(const Register &rd, const Register &rs, const mRegisterID rt)
+    {
+        masm.addu(rd.code(), rs.code(), rt);
     }
 
 };
