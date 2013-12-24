@@ -14,7 +14,9 @@
 namespace js {
 namespace jit {
 
-static MOZ_CONSTEXPR_VAR Register BaselineFrameReg = fp;
+// by wangqing, fp-->s2
+//static const Register BaselineFrameReg = fp;
+static const Register BaselineFrameReg = s2;
 static MOZ_CONSTEXPR_VAR Register BaselineStackReg = sp;
 
 // ValueOperands R0, R1, and R2

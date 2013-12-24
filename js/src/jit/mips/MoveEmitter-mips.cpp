@@ -260,30 +260,19 @@ MoveEmitterMIPS::emitGeneralMove(const MoveOperand &from, const MoveOperand &to)
             masm.lea(toOperand(from), to.reg());
     } else if (from.isMemory()) {
         // Memory to memory gpr move.
-#ifdef JS_CPU_X64
-        // x64 has a ScratchReg. Use it.
-        masm.loadPtr(toAddress(from), ScratchReg);
-        masm.mov(ScratchReg, toOperand(to));
-#else
         // No ScratchReg; bounce it off the stack.
         masm.Push(toOperand(from));
         masm.Pop(toPopOperand(to));
-#endif
     } else {
         // Effective address to memory move.
         JS_ASSERT(from.isEffectiveAddress());
-#ifdef JS_CPU_X64
-        // x64 has a ScratchReg. Use it.
-        masm.lea(toOperand(from), ScratchReg);
-        masm.mov(ScratchReg, toOperand(to));
-#else
+
         // This is tricky without a ScratchReg. We can't do an lea. Bounce the
         // base register off the stack, then add the offset in place. Note that
         // this clobbers FLAGS!
         masm.Push(from.base());
         masm.Pop(toPopOperand(to));
         masm.addPtr(Imm32(from.disp()), toOperand(to));
-#endif
     }
 }
 

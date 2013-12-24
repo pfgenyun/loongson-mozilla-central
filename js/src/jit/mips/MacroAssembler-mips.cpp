@@ -245,7 +245,7 @@ MacroAssemblerMIPS::callWithABIPre(uint32_t *stackAdjust)
         // Check call alignment.
         Label good;
         //TODO
-        //testl(esp, Imm32(StackAlignment - 1));
+        testl(sp, Imm32(StackAlignment - 1));
         j(Equal, &good);
         breakpoint();
         bind(&good);

@@ -139,8 +139,8 @@ class ABIArgGenerator
     static const Register NonVolatileReg;
 };
 
-static MOZ_CONSTEXPR_VAR Register OsrFrameReg = s6;  //edx;
-static MOZ_CONSTEXPR_VAR Register PreBarrierReg =s6;  // edx;
+static MOZ_CONSTEXPR_VAR Register OsrFrameReg = t7;  //edx;
+static MOZ_CONSTEXPR_VAR Register PreBarrierReg =t7;  // edx;
 
 // GCC stack is aligned on 16 bytes, but we don't maintain the invariant in
 // jitted code.
@@ -1530,12 +1530,11 @@ class Assembler
     void j(Condition cond, RepatchLabel *label) { jSrc(cond, label); }
     void jmp(RepatchLabel *label) { jmpSrc(label); }
 
-   void jmp(const Operand &op){
+    void jmp(const Operand &op){
         switch (op.kind()) {
           case Operand::MEM_REG_DISP:
-            // New branch,
-            JS_ASSERT(0);
             //masm.jmp_m(op.disp(), op.base());
+            mcss.jump(mAddress(op.base(), op.disp()));
             break;
           case Operand::MEM_SCALE:
 //ok            masm.jmp_m(op.disp(), op.base(), op.index(), op.scale());
