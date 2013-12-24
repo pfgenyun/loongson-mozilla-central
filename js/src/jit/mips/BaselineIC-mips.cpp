@@ -20,21 +20,23 @@ namespace jit {
 bool
 ICCompare_Double::Compiler::generateStubCode(MacroAssembler &masm)
 {
-    Label failure, notNaN;
+    Label failure, notNaN, isTrue;
     masm.ensureDouble(R0, FloatReg0, &failure);
     masm.ensureDouble(R1, FloatReg1, &failure);
 
     Register dest = R0.scratchReg();
 
     Assembler::DoubleCondition cond = JSOpToDoubleCondition(op);
-    masm.mov(ImmWord(0), dest);
-    masm.compareDouble(cond, FloatReg0, FloatReg1);
-    masm.setCC(Assembler::ConditionFromDoubleCondition(cond), dest);
+    masm.addiu(dest, zero, 1);
+    masm.branchDouble(cond, FloatReg0, FloatReg1, &isTrue);
+    masm.xorl(dest, dest);
+    masm.bind(&isTrue);
+
 
     // Check for NaN, if needed.
     Assembler::NaNCond nanCond = Assembler::NaNCondFromDoubleCondition(cond);
     if (nanCond != Assembler::NaN_HandledByCond) {
-      masm.j(Assembler::NoParity, &notNaN);
+      masm.branchDouble(Assembler::DoubleOrdered, FloatReg0, FloatReg1, &notNaN);
       masm.mov(ImmWord(nanCond == Assembler::NaN_IsTrue), dest);
       masm.bind(&notNaN);
     }
@@ -48,10 +50,8 @@ ICCompare_Double::Compiler::generateStubCode(MacroAssembler &masm)
     return true;
 }
 
-
 //from jit/x86/BaselineIC-x86.cpp
 // ICCompare_Int32
-
 bool
 ICCompare_Int32::Compiler::generateStubCode(MacroAssembler &masm)
 {
@@ -64,7 +64,7 @@ ICCompare_Int32::Compiler::generateStubCode(MacroAssembler &masm)
     Assembler::Condition cond = JSOpToCondition(op, /* signed = */true);
     masm.cmpl(R0.payloadReg(), R1.payloadReg());
     masm.setCC(cond, R0.payloadReg());
-    masm.movzbl(R0.payloadReg(), R0.payloadReg());
+    masm.movzxbl(R0.payloadReg(), R0.payloadReg());
 
     // Box the result and return
     masm.tagValue(JSVAL_TYPE_BOOLEAN, R0.payloadReg(), R0);
@@ -91,12 +91,18 @@ ICBinaryArith_Int32::Compiler::generateStubCode(MacroAssembler &masm)
     Register scratchReg = BaselineTailCallReg;
 
     Label revertRegister, maybeNegZero;
-#if 0
     switch(op_) {
       case JSOP_ADD:
         // Add R0 and R1.  Don't need to explicitly unbox.
+      
+        //mov tow oprand to cmp registers to prepared for Overflow check.
+        masm.cmpl(R0.payloadReg(), R1.payloadReg());
+        masm.negl(cmpTemp2Register);
+
+        //do the add
         masm.movl(R0.payloadReg(), scratchReg);
         masm.addl(R1.payloadReg(), scratchReg);
+
 
         // Just jump to failure on overflow.  R0 and R1 are preserved, so we can just jump to
         // the next stub.
@@ -106,6 +112,8 @@ ICBinaryArith_Int32::Compiler::generateStubCode(MacroAssembler &masm)
         masm.movl(scratchReg, R0.payloadReg());
         break;
       case JSOP_SUB:
+        masm.cmpl(R0.payloadReg(), R1.payloadReg());
+
         masm.movl(R0.payloadReg(), scratchReg);
         masm.subl(R1.payloadReg(), scratchReg);
         masm.j(Assembler::Overflow, &failure);
@@ -114,7 +122,15 @@ ICBinaryArith_Int32::Compiler::generateStubCode(MacroAssembler &masm)
       case JSOP_MUL:
         masm.movl(R0.payloadReg(), scratchReg);
         masm.imull(R1.payloadReg(), scratchReg);
-        masm.j(Assembler::Overflow, &failure);
+
+        //original overflow check, removed by weizhenwei, 2013.12.23
+        //masm.j(Assembler::Overflow, &failure);
+
+        //test whether signed multiply overflow. by weizhenwei, 2013.12.23
+        masm.mfhi(cmpTempRegister);
+        masm.mflo(cmpTemp2Register);
+        masm.sarl(Imm32(0x1f), cmpTemp2Register);
+        masm.j(Assembler::NotEqual, &failure);
 
         masm.testl(scratchReg, scratchReg);
         masm.j(Assembler::Zero, &maybeNegZero);
@@ -128,19 +144,18 @@ ICBinaryArith_Int32::Compiler::generateStubCode(MacroAssembler &masm)
         // Prevent negative 0 and -2147483648 / -1.
         masm.branchTest32(Assembler::Zero, R0.payloadReg(), Imm32(0x7fffffff), &failure);
 
-        // For idiv we need eax.
-        JS_ASSERT(R1.typeReg() == eax);
-        masm.movl(R0.payloadReg(), eax);
         // Preserve R0.payloadReg()/edx, eax is JSVAL_TYPE_INT32.
-        masm.movl(R0.payloadReg(), scratchReg);
-        // Sign extend eax into edx to make (edx:eax), since idiv is 64-bit.
-        masm.cdq();
-        masm.idiv(R1.payloadReg());
+        masm.div(R0.payloadReg(), R1.payloadReg());
 
         // A remainder implies a double result.
-        masm.branchTest32(Assembler::NonZero, edx, edx, &revertRegister);
+        //masm.branchTest32(Assembler::NonZero, edx, edx, &revertRegister);
+        //by weizhenwei, 2013.11.02
+        masm.mfhi(cmpTempRegister);
+        masm.movl(zero, cmpTemp2Register);
+        masm.j(Assembler::NotEqual, &failure);
 
-        masm.movl(eax, R0.payloadReg());
+        //by weizhenwei, 2013.12.23
+        masm.mflo(R0.payloadReg());
         break;
       case JSOP_MOD:
       {
@@ -150,25 +165,23 @@ ICBinaryArith_Int32::Compiler::generateStubCode(MacroAssembler &masm)
         // Prevent negative 0 and -2147483648 % -1.
         masm.branchTest32(Assembler::Zero, R0.payloadReg(), Imm32(0x7fffffff), &failure);
 
-        // For idiv we need eax.
-        JS_ASSERT(R1.typeReg() == eax);
-        masm.movl(R0.payloadReg(), eax);
-        // Preserve R0.payloadReg()/edx, eax is JSVAL_TYPE_INT32.
-        masm.movl(R0.payloadReg(), scratchReg);
-        // Sign extend eax into edx to make (edx:eax), since idiv is 64-bit.
-        masm.cdq();
-        masm.idiv(R1.payloadReg());
+	masm.div(R0.payloadReg(), R1.payloadReg());
 
         // Fail when we would need a negative remainder.
         Label done;
-        masm.branchTest32(Assembler::NonZero, edx, edx, &done);
-        masm.branchTest32(Assembler::Signed, scratchReg, scratchReg, &revertRegister);
-        masm.branchTest32(Assembler::Signed, R1.payloadReg(), R1.payloadReg(), &revertRegister);
+        //masm.branchTest32(Assembler::NonZero, edx, edx, &done);
+        masm.mfhi(cmpTempRegister);
+        masm.movl(zero, cmpTemp2Register);
+        masm.j(Assembler::NotEqual, &done);
+
+        masm.branchTest32(Assembler::Signed, R0.payloadReg(), R0.payloadReg(), &failure);
+        masm.branchTest32(Assembler::Signed, R1.payloadReg(), R1.payloadReg(), &failure);
+
 
         masm.bind(&done);
-        // Result is in edx, tag in ecx remains untouched.
-        JS_ASSERT(R0.payloadReg() == edx);
-        JS_ASSERT(R0.typeReg() == ecx);
+
+        //move reminder to R0.payloadReg, by weizhenwei, 2013.12.23
+        masm.mfhi(R0.payloadReg());
         break;
       }
       case JSOP_BITOR:
@@ -183,24 +196,29 @@ ICBinaryArith_Int32::Compiler::generateStubCode(MacroAssembler &masm)
         masm.andl(R1.payloadReg(), R0.payloadReg());
         break;
       case JSOP_LSH:
-        // RHS needs to be in ecx for shift operations.
-        JS_ASSERT(R0.typeReg() == ecx);
-        masm.movl(R1.payloadReg(), ecx);
-        masm.shll_cl(R0.payloadReg());
+        //R0.payloadReg() is result, R1.payloadReg90 is shiftAmount.
+        //rewrite by weizhenwei, 2013.12.23
+        masm.sllv(R0.payloadReg(), R0.payloadReg(), R1.payloadReg());
+
         // We need to tag again, because we overwrote it.
         masm.tagValue(JSVAL_TYPE_INT32, R0.payloadReg(), R0);
         break;
       case JSOP_RSH:
-        masm.movl(R1.payloadReg(), ecx);
-        masm.sarl_cl(R0.payloadReg());
+        //R0.payloadReg() is result, R1.payloadReg90 is shiftAmount.
+        //rewrite by weizhenwei, 2013.12.23
+        masm.srav(R0.payloadReg(), R0.payloadReg(), R1.payloadReg());
+
+        // We need to tag again, because we overwrote it.
         masm.tagValue(JSVAL_TYPE_INT32, R0.payloadReg(), R0);
         break;
       case JSOP_URSH:
         if (!allowDouble_)
             masm.movl(R0.payloadReg(), scratchReg);
 
-        masm.movl(R1.payloadReg(), ecx);
-        masm.shrl_cl(R0.payloadReg());
+        //R0.payloadReg() is result, R1.payloadReg() is shiftAmount.
+        //rewrite by weizhenwei, 2013.11.06
+        masm.srlv(R0.payloadReg(), R0.payloadReg(), R1.payloadReg());
+
         masm.testl(R0.payloadReg(), R0.payloadReg());
         if (allowDouble_) {
             Label toUint;
@@ -221,7 +239,7 @@ ICBinaryArith_Int32::Compiler::generateStubCode(MacroAssembler &masm)
       default:
        MOZ_ASSUME_UNREACHABLE("Unhandled op for BinaryArith_Int32.  ");
     }
-#endif
+
     // Return.
     EmitReturnFromIC(masm);
 
@@ -232,17 +250,13 @@ ICBinaryArith_Int32::Compiler::generateStubCode(MacroAssembler &masm)
         // Result is -0 if exactly one of lhs or rhs is negative.
         masm.movl(R0.payloadReg(), scratchReg);
         masm.orl(R1.payloadReg(), scratchReg);
+        //add by QuQiuwen;
+        masm.cmpl(scratchReg,zero);
         masm.j(Assembler::Signed, &failure);
 
         // Result is +0.
-        masm.mov(ImmWord(0), R0.payloadReg());
+        masm.xorl(R0.payloadReg(), R0.payloadReg());
         EmitReturnFromIC(masm);
-        break;
-      case JSOP_DIV:
-      case JSOP_MOD:
-        masm.bind(&revertRegister);
-        masm.movl(scratchReg, R0.payloadReg());
-        masm.movl(ImmType(JSVAL_TYPE_INT32), R1.typeReg());
         break;
       case JSOP_URSH:
         // Revert the content of R0 in the fallible >>> case.

@@ -18,25 +18,25 @@ static MOZ_CONSTEXPR_VAR Register BaselineFrameReg = fp;
 static MOZ_CONSTEXPR_VAR Register BaselineStackReg = sp;
 
 // ValueOperands R0, R1, and R2
-static MOZ_CONSTEXPR_VAR ValueOperand R0(v1, v0);
+static MOZ_CONSTEXPR_VAR ValueOperand R0(t7, t8);
 static MOZ_CONSTEXPR_VAR ValueOperand R1(s1, s0);
-static MOZ_CONSTEXPR_VAR ValueOperand R2(t7, t6);
+static MOZ_CONSTEXPR_VAR ValueOperand R2(s3, s4);
 
 // BaselineTailCallReg and BaselineStubReg reuse
 // registers from R2.
-static MOZ_CONSTEXPR_VAR Register BaselineTailCallReg = t6;
-static MOZ_CONSTEXPR_VAR Register BaselineStubReg     = t7;
+static MOZ_CONSTEXPR_VAR Register BaselineTailCallReg = s3;
+static MOZ_CONSTEXPR_VAR Register BaselineStubReg     = s4;
 
 static MOZ_CONSTEXPR_VAR Register ExtractTemp0        = InvalidReg;
 static MOZ_CONSTEXPR_VAR Register ExtractTemp1        = InvalidReg;
 
 // FloatReg0 must be equal to ReturnFloatReg.
 static MOZ_CONSTEXPR_VAR FloatRegister FloatReg0      = f0;
-static MOZ_CONSTEXPR_VAR FloatRegister FloatReg1      = f2;
+static MOZ_CONSTEXPR_VAR FloatRegister FloatReg1      = f4;
 
 } // namespace jit
 } // namespace js
 
 #endif // JS_ION
 
-#endif /* jit_x86_BaselineRegisters_x86_h */
+#endif /* jit_mips_BaselineRegisters_mips_h */

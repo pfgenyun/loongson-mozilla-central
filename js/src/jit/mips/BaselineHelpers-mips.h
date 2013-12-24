@@ -296,4 +296,4 @@ EmitStubGuardFailure(MacroAssembler &masm)
 
 #endif // JS_ION
 
-#endif /* jit_x86_BaselineHelpers_x86_h */
+#endif /* jit_mips_BaselineHelpers_mips_h */

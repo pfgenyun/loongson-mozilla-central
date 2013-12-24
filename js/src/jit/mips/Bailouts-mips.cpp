@@ -6,7 +6,6 @@
 
 #include "jscntxt.h"
 #include "jscompartment.h"
-
 #include "jit/Bailouts.h"
 #include "jit/JitCompartment.h"
 #include "jit/IonFrames-inl.h"

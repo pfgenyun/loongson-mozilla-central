@@ -23,4 +23,4 @@ typedef BaselineCompilerMIPS BaselineCompilerSpecific;
 } // namespace jit
 } // namespace js
 
-#endif /* jit_x86_BaselineCompiler_x86_h */
+#endif /* jit_mips_BaselineCompiler_mips_h */
