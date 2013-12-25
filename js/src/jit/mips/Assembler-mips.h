@@ -806,14 +806,18 @@ class Assembler
     void mov(Imm32 imm, const Operand &dest) {
         movl(imm, dest);
     }
+    
+    //author:huangwenjun date:2013-12-23
     void mov(AbsoluteLabel *label, const Register &dest) {
         JS_ASSERT(!label->bound());
         // Thread the patch list through the unpatched address word in the
         // instruction stream.
-     //   masm.movl_i32r(label->prev(), dest.code());
-        mcss.move(mTrustedImmPtr(reinterpret_cast<const void*>(label->prev())), dest.code());
+        int offset = label->prev();
+        lui(dest, offset >> 16);
+        ori(dest.code(), dest.code(), offset&0x0000ffff);
         label->setPrev(masm.size());
     }
+
     void mov(const Register &src, const Register &dest) {
         movl(src, dest);
     }
@@ -919,17 +923,126 @@ class Assembler
        return label; 
     }
 
+    //author:huangwenjun date:2013-12-23
     void jmp(ImmPtr target, Relocation::Kind reloc = Relocation::HARDCODED) {
-     //  JmpSrc src = masm.jmp();
         JmpSrc src = mcss.jump().m_jmp;
-        addPendingJump(src, target, reloc);
+        int to = (int)(target.value);
+        lui(t9, to>>16);
+        ori(t9, t9, to&0x0000ffff);
+
+        if(reloc == Relocation::IONCODE) {
+            JmpSrc src(size());
+            addPendingJump(src, target, reloc);
+        }
+
+        jr(t9);
+        nop();
     }
+    
+    //author:huangwenjun date:2013-12-23
     void j(Condition cond, ImmPtr target,
-           Relocation::Kind reloc = Relocation::HARDCODED) {
-    //    JmpSrc src = masm.jCC(static_cast<JSC::MIPSAssembler::Condition>(cond));
-        JmpSrc src = mcss.branch32(static_cast<JSC::MacroAssemblerMIPS::Condition>(cond), cmpTempRegister.code(), cmpTemp2Register.code()).m_jmp;
-        addPendingJump(src, target, reloc);
+        Relocation::Kind reloc = Relocation::HARDCODED) {
+        Register left = cmpTempRegister;
+        Register right = cmpTemp2Register;
+        Register regZero = zero;
+        Register tmp = dataTempRegister;
+        int to = (int)(target.value);
+        //int to = (int)(target);
+
+        if (cond == Equal || cond == Zero)
+        {
+           //masm.bne(left.code(), right.code(), 4);
+           bne(left, right, 4);
+        }
+        else if (cond == NotEqual || cond == NonZero)
+        {
+            //masm.beq(left.code(), right.code(), 4);
+            beq(left, right, 4);
+        }
+        else if (cond == Above) {
+            sltu(tmp, right, left);
+            beq(tmp, regZero, 4);
+        }
+        else if (cond == AboveOrEqual) {
+            sltu(tmp, left, right);
+            bne(tmp, regZero, 4);
+        }
+        else if (cond == Below) {
+            sltu(tmp, left, right);
+            beq(tmp, regZero, 4);
+        }
+        else if (cond == BelowOrEqual) {
+            sltu(tmp, right, left);
+            bne(tmp, regZero, 4);
+        }
+        else if (cond == GreaterThan) {
+            slt(tmp, right, left);
+            beq(tmp, regZero, 4);
+        }
+        else if (cond == GreaterThanOrEqual) {
+            slt(tmp, left, right);
+            bne(tmp, regZero, 4);
+        }
+        else if (cond == LessThan) {
+            slt(tmp, left, right);
+         beq(tmp, regZero, 4);
+        }
+        else if (cond == LessThanOrEqual) {
+            slt(tmp, right, left);
+            bne(tmp, regZero, 4);
+         }
+        else if (cond == Overflow) {
+        /*
+            xor     cmpTemp, left, right
+            bgez    No_overflow, cmpTemp    # same sign bit -> no overflow
+            nop
+            subu    cmpTemp, left, right
+            xor     cmpTemp, cmpTemp, left
+            bgez    No_overflow, cmpTemp    # same sign bit -> no overflow
+           
+            lui
+            ori     
+            jr
+            nop
+
+          No_overflow:
+        */
+        xorInsn(tmp, left, right);
+            bgez(tmp, 8);
+            nop();
+            subu(tmp, left, right);
+            xorInsn(tmp, tmp, left);
+            bgez(tmp, 4);
+        }
+        else if (cond == Signed) {
+            subu(tmp, left, right);
+            // Check if the result is negative.
+            slt(tmp, tmp, regZero);
+            beq(tmp, regZero, 4);
+        }
+        lui(t9,to>>16);
+        ori(t9,t9,to&0x0000ffff);
+        if(reloc == Relocation::IONCODE) {
+            JmpSrc src(size());
+            addPendingJump(src, target, reloc);
+        }
+        jr(t9);
+        nop();
     }
+
+    //author:huangwenjun date:2013-12-23
+    void call(IonCode *target);
+    
+    //author:huangwenjun date:2013-12-23
+    //need check
+    void call(ImmPtr target);
+    void call(Label *label);
+    void call(const Register &reg);
+    void call(const Operand &op);
+    void call(ImmWord target);
+
+    //author:huangwenjun need check
+    void call(AsmJSImmPtr target);
 
     void jmp(IonCode *target) {
         jmp(ImmPtr(target->raw()), Relocation::IONCODE);
@@ -937,61 +1050,49 @@ class Assembler
     void j(Condition cond, IonCode *target) {
         j(cond, ImmPtr(target->raw()), Relocation::IONCODE);
     }
-    void call(IonCode *target) {
-  //      JmpSrc src = masm.call();
-        mcss.offsetFromPCToV0(sizeof(int*)*7);
-        mcss.push(mRegisterID(v0.code()));//2insns
-        JmpSrc src = mcss.call().m_jmp;//4insns
-        addPendingJump(src, ImmPtr(target->raw()), Relocation::IONCODE);
-    }
-    
-    void call(ImmWord target) {
-//ok        JmpSrc src = masm.call();
-    //arm : ma_call((void *) word.value);
-//    mcss.offsetFromPCToV0(sizeof(int*)*7);//2insns
-//    mcss.push(mRegisterID(v0.code()));//2insns
-////        JmpSrc src = mcss.call().m_jmp;
-////        addPendingJump(src, target.asPointer(), Relocation::HARDCODED);
-        call(ImmPtr((void*)target.value));
-    }
-
-    void call(ImmPtr target) {
-//        JmpSrc src = masm.call();
-//        addPendingJump(src, target, Relocation::HARDCODED);
-        JmpSrc src = mcss.call().m_jmp;
-        addPendingJump(src, target, Relocation::HARDCODED);
-    }
-
-    // New function
-    void call(AsmJSImmPtr target) {
-        JS_ASSERT(0);
-        // Moving to a register is suboptimal. To fix (use a single
-        // call-immediate instruction) we'll need to distinguish a new type of
-        // relative patch to an absolute address in AsmJSAbsoluteLink.
-//        mov(target, eax);
-//        call(eax);
-    }
 
     // Emit a CALL or CMP (nop) instruction. ToggleCall can be used to patch
     // this instruction.
+    // 8 ins
+    // author: huangwenjun date:2013-12-23
     CodeOffsetLabel toggledCall(IonCode *target, bool enabled) {
- 	ASSERT(0);
         CodeOffsetLabel offset(size());
-         /*  JmpSrc src = enabled ? masm.call() : masm.cmp_eax();
-         addPendingJump(src, target->raw(), Relocation::IONCODE);
-              JS_ASSERT(size() - offset.offset() == ToggledCallSize());
-         */
+
+        int to = (int)(target->raw());
+        Register regZero = zero;
+        CodeLabel cl;
+
+        mov(cl.dest(),t9);
+        if(enabled){
+            push(t9);
+        } else{
+            beq(regZero, regZero, 5);
+            nop();
+        }
+        lui(t9,to>>16);
+        ori(t9,t9,to&0x0000ffff);
+
+        JmpSrc src(size());
+        addPendingJump(src, ImmPtr(target->raw()), Relocation::IONCODE);
+
+        jalr(t9);
+        nop();
+        bind(cl.src());
+        addCodeLabel(cl);
+
+        JS_ASSERT((size() - offset.offset()) == ToggledCallSize());
         return offset;
     }
 
+    // author: huangwenjun date:2013-12-23
     static size_t ToggledCallSize() {
         // Size of a call instruction.
-        // return 5;
-    	return 32;
+    	return 32;//4*8
     }
 
     // Re-routes pending jumps to an external target, flushing the label in the
     // process.
+    // author: huangwenjun date:2013-12-23
     void retarget(Label *label, ImmPtr target, Relocation::Kind reloc) {
         JSC::MacroAssembler::Label jsclabel;
         if (label->used()) {
@@ -1000,9 +1101,15 @@ class Assembler
             do {
                 JSC::MIPSAssembler::JmpSrc next;
                 more = masm.nextJump(jmp, &next);
-                addPendingJump(jmp, target, reloc);
+                //hwj
+                masm.clearOffsetForLabel(jmp);
+                masm.preLink(jmp, target.value);
+
+                //save the pointer after lui,ori 
+                if(reloc == Relocation::IONCODE)
+                    addPendingJump(JSC::MIPSAssembler::JmpSrc(jmp.offset()-8), target, reloc);
                 jmp = next;
-            } while (more);
+           } while (more);
         }
         label->reset();
     }
@@ -1476,27 +1583,32 @@ class Assembler
     void align(int alignment) {
         masm.align(alignment);
     }
+
+    // author: huangwenjun date:2013-12-23
     void writeCodePointer(AbsoluteLabel *label) {
-      	ASSERT(0);
-   /*     JS_ASSERT(!label->bound());
+         JS_ASSERT(!label->bound());
         // Thread the patch list through the unpatched address word in the
         // instruction stream.
-        masm.jumpTablePointer(label->prev());
+        masm.emitInst(label->prev());
         label->setPrev(masm.size());
-        */
+        // for JumpTable
+        label->setType(1);
     }
+    
+    // author: huangwenjun date:2013-12-23
     void writeDoubleConstant(double d, Label *label) {
-        ASSERT(0);
-    /*    label->bind(masm.size());
+        label->bind(masm.size());
         masm.doubleConstant(d);
-    */
     }
+
+    // author: huangwenjun date:2013-12-23 need check
     //New function
     void writeFloatConstant(float f, Label *label) {
         JS_ASSERT(0);
 //        label->bind(masm.size());
 //        masm.floatConstant(f);
     }
+
     void movl(const Imm32 &imm32, const Register &dest) {
    //     masm.movl_i32r(imm32.value, dest.code());
     mcss.move(mTrustedImm32(imm32.value), dest.code());
@@ -2142,8 +2254,8 @@ class Assembler
     }
 
   protected:
+    //author:huangwenjun date:2013-12-23
     JmpSrc jSrc(Condition cond, Label *label) {
-//okm        JmpSrc j = masm.jCC(static_cast<JSC::X86Assembler::Condition>(cond));
         JmpSrc j = mcss.branch32(static_cast<JSC::MacroAssemblerMIPS::Condition>(cond), cmpTempRegister.code(), cmpTemp2Register.code()).m_jmp;
         if (label->bound()) {
             // The jump can be immediately patched to the correct destination.
@@ -2155,8 +2267,9 @@ class Assembler
         }
         return j;
     }
+
+    //author:huangwenjun date:2013-12-23
     JmpSrc jmpSrc(Label *label) {
-//ok        JmpSrc j = masm.jmp();
         JmpSrc j = mcss.jump().m_jmp;
         if (label->bound()) {
             // The jump can be immediately patched to the correct destination.
@@ -2184,8 +2297,8 @@ class Assembler
 //        return j;
 //    }
 
+    //author:huangwenjun date:2013-12-23
     JmpSrc jSrc(Condition cond, RepatchLabel *label) {
-     //   JmpSrc j = masm.jCC(static_cast<JSC::X86Assembler::Condition>(cond));
        JmpSrc j = mcss.branch32(static_cast<JSC::MacroAssemblerMIPS::Condition>(cond), cmpTempRegister.code(), cmpTemp2Register.code()).m_jmp;
         if (label->bound()) {
             // The jump can be immediately patched to the correct destination.
@@ -2195,8 +2308,10 @@ class Assembler
         }
         return j;
     }
+
+    //author:huangwenjun date:2013-12-23
     JmpSrc jmpSrc(RepatchLabel *label) {
-      /*  JmpSrc j = masm.jmp();
+        JmpSrc j = mcss.jump().getJmpSrc();
         if (label->bound()) {
             // The jump can be immediately patched to the correct destination.
             masm.linkJump(j, JmpDst(label->offset()));
@@ -2204,10 +2319,7 @@ class Assembler
             // Thread the jump list through the unpatched jump targets.
             label->use(j.offset());
         }
-        return j;*/
-	ASSERT(0);
-	//in mips jmp() need to define in assembler/assembler/
-	return 0;
+        return j;
     }
 
   public:
@@ -2216,19 +2328,17 @@ class Assembler
     void jmp(Label *label) { jmpSrc(label); }
     void j(Condition cond, RepatchLabel *label) { jSrc(cond, label); }
     void jmp(RepatchLabel *label) { jmpSrc(label); }
-
+    
+    //author:huangwenjun date:2013-12-23
     void jmp(const Operand &op){
         switch (op.kind()) {
           case Operand::MEM_REG_DISP:
-            //masm.jmp_m(op.disp(), op.base());
             mcss.jump(mAddress(op.base(), op.disp()));
             break;
           case Operand::MEM_SCALE:
-//ok            masm.jmp_m(op.disp(), op.base(), op.index(), op.scale());
             mcss.jump(mBaseIndex(op.base(), op.index(), mScale(op.scale()), op.disp()));
             break;
           case Operand::REG:
-//ok            masm.jmp_r(op.reg());
             mcss.jump(op.reg());
             break;
           default:
@@ -2237,28 +2347,40 @@ class Assembler
     }
     // no used
  //   void cmpEAX(Label *label) { cmpSrc(label); }
+    
+    //author:huangwenjun date:2013-12-23
     void bind(Label *label) {
         JSC::MacroAssembler::Label jsclabel;
+        JSC::MIPSAssembler::JmpDst dst(masm.label());
         if (label->used()) {
             bool more;
             JSC::MIPSAssembler::JmpSrc jmp(label->offset());
             do {
                 JSC::MIPSAssembler::JmpSrc next;
                 more = masm.nextJump(jmp, &next);
-                masm.linkJump(jmp, masm.label());
+                
+                //author:huangwenjun date:2013-12-23
+                masm.clearOffsetForLabel(jmp);
+                masm.linkJump(jmp, dst);
+
                 jmp = next;
             } while (more);
         }
-        label->bind(masm.label().offset());
+        label->bind(dst.offset());
     }
+
+    //author:huangwenjun date:2013-12-23
     void bind(RepatchLabel *label) {
         JSC::MacroAssembler::Label jsclabel;
         if (label->used()) {
             JSC::MIPSAssembler::JmpSrc jmp(label->offset());
+            //hwj
+            masm.clearOffsetForLabel(jmp);
             masm.linkJump(jmp, masm.label());
         }
         label->bind(masm.label().offset());
     }
+
     uint32_t currentOffset() {
         return masm.label().offset();
     }
@@ -2287,17 +2409,36 @@ class Assembler
         }
         label->reset();
     }
-
+    
+    //author:huangwenjun date:2013-12-23
     static void Bind(uint8_t *raw, AbsoluteLabel *label, const void *address) {
-        if (label->used()) {
+        if (label->used()&&(label->getType())) {//1 jump table
             intptr_t src = label->offset();
             do {
-                intptr_t next = reinterpret_cast<intptr_t>(JSC::MIPSAssembler::getPointer(raw + src));
-                JSC::MIPSAssembler::setPointer(raw + src, address);
+                intptr_t next =*((intptr_t*)(raw + src-5));//date:1108
+                *((int*)(raw + src-4)) = (int)address;
                 src = next;
             } while (src != AbsoluteLabel::INVALID_OFFSET);
-        }
-        label->bind();
+        } else if (label->used()&&(!label->getType())) {
+            //0 for mov function
+            intptr_t src = label->offset();
+            do {
+                //hwj   //wangqing
+                int* ptrLuiIns = (int*)(raw+src-8);//hwj date:1030
+                int* ptrOriIns = (int*)(raw+src-4);//hwj date:1030
+
+                int luiIns = *ptrLuiIns;
+                int oriIns = *ptrOriIns;
+
+                JS_ASSERT((luiIns&0xfc000000)==0x3c000000);
+                JS_ASSERT((oriIns&0xfc000000)==0x34000000);
+                intptr_t next = ((luiIns & 0x0000ffff)<<16) |(oriIns &0x0000ffff);
+                *(ptrLuiIns) = (luiIns&0xffff0000)|((((int)address)&0xffff0000)>>16);
+                *(ptrOriIns) = (oriIns&0xffff0000)|(((int)address)&0x0000ffff);
+                src = next;
+             } while (src != AbsoluteLabel::INVALID_OFFSET);
+       }
+       label->bind();
     }
 
     // See Bind and JSC::X86Assembler::setPointer.
@@ -2309,15 +2450,15 @@ class Assembler
         pop(ra);
         mcss.ret();
     }
-   void retn(Imm32 n);
+    void retn(Imm32 n);
     JmpSrc callWithPush();
     JmpSrc callRelWithPush();
-    void call(Label *label);
-    void call(const Register &reg);
-    void call(const Operand &op);
-
-   // void call(IonCode *target);
-//    void call(ImmWord target);
+    
+    //author:huangwenjun date:2013-12-25
+    void ma_call(const Register &reg);//for js->c++
+    void ma_call(const Operand &op);//for js->c++
+    void ma_call(ImmWord target);//for js->c++
+    JmpSrc ma_call(void *dest);
 
    // calls an Ion function, assumes that the stack is untouched (8 byte alinged)
     JmpSrc ma_callIon(const Register reg);
@@ -2325,8 +2466,6 @@ class Assembler
     JmpSrc ma_callIonNoPush(const Register reg);
     // calls an ion function, assuming that the stack is currently not 8 byte aligned
     JmpSrc ma_callIonHalfPush(const Register reg);
-
-    JmpSrc ma_call(void *dest);
 
     void breakpoint() {
     //    masm.int3();
@@ -2373,9 +2512,8 @@ class Assembler
     void cmpl(const Operand &op, ImmPtr imm) {
         cmpl(op, ImmWord(uintptr_t(imm.value)));
     }
-    void setCC(Condition cond, const Register &r) {
-    //    masm.setCC_r(static_cast<JSC::X86Assembler::Condition>(cond), r.code());
-    }
+    //author:huangwenjun date:2013-12-25
+    void setCC(Condition cond, const Register &r);
     void testb(const Register &lhs, const Register &rhs) {
         JS_ASSERT(GeneralRegisterSet(Registers::SingleByteRegs).has(lhs));//SingleBytesRegs:t6,t7,t8,s0...s7,v0
         JS_ASSERT(GeneralRegisterSet(Registers::SingleByteRegs).has(rhs));//?
@@ -3259,14 +3397,13 @@ class Assembler
     }
 
     // Patching.
-
+    //author:huangwenjun date:2013-12-23
     static size_t patchWrite_NearCallSize() {
-     //   return 5;
-         return 36;
+        return 32;//8*4
     }
+
+    //author:huangwenjun date:2013-12-23
     static uintptr_t getPointer(uint8_t *instPtr) {
-  //      uintptr_t *ptr = ((uintptr_t *) instPtr) - 1;
-  //      return *ptr;
         uintptr_t ptr = reinterpret_cast<uintptr_t>(JSC::MIPSAssembler::getPointer(instPtr));
         return ptr;
     }
@@ -3322,32 +3459,41 @@ class Assembler
         MOZ_ASSUME_UNREACHABLE("nextInstruction NYI on MIPS");
     }
 
-//CMP->JMP
+    //author:huangwenjun date:2013-12-23
+    //CMP->JMP
     // Toggle a jmp or cmp emitted by toggledJump().
     static void ToggleToJmp(CodeLocationLabel inst) {
-  /*        uint8_t *ptr = (uint8_t *)inst.raw();
-    //CMP AX,imm16
-    JS_ASSERT(*ptr == 0x3D);
-    //JMP rel32
-    *ptr = 0xE9;*/
-    ASSERT(0);
+        int *ptr = (int *)inst.raw();
+
+        ASSERT(*(ptr) == 0x10000005); //cmp eax
+        *(ptr)=*(ptr+5);    //jmp recover
+        *(ptr+5) = 0x00000000;
     }
+
+    //author:huangwenjun date:2013-12-23
     //JMP->CMP
     static void ToggleToCmp(CodeLocationLabel inst) {
-     /*    uint8_t *ptr = (uint8_t *)inst.raw();
-    JS_ASSERT(*ptr == 0xE9);
-    *ptr = 0x3D;
-    */
-        ASSERT(0);
+        int *ptr = (int *)inst.raw();
+        ASSERT(*(ptr+5) == 0x00000000);
+        *(ptr+5) = *ptr;    //backup fisrt instruction to nop
+        *(ptr)=0x10000005;    //cmp eax
     }
- //set CMP|CALL     
-         //NOTE* :this is new in ff24;
+
+    //author:huangwenjun date:2013-12-23
+    //set CMP|CALL     
     static void ToggleCall(CodeLocationLabel inst, bool enabled) {
-   /*     uint8_t *ptr = (uint8_t *)inst.raw();
-        JS_ASSERT(*ptr == 0x3D || // CMP
-                  *ptr == 0xE8);  // CALL
-        *ptr = enabled ? 0xE8 : 0x3D;*/
-            ASSERT(0);
+        int *ptr = (int *)inst.raw();
+
+        ASSERT(((*(ptr+2)==0x10000005)&&(*(ptr+3) == 0x00000000))       //beq 0,0,5; nop ;        
+             ||((*(ptr+2)==0x27bdfffc)&&(*(ptr+3) == 0xafb90000)));    //addiu, sp, sp,-4; sw t9,0(sp);
+        if(enabled) {
+            *(ptr+2) = 0x27bdfffc;      //addiu, sp, sp,-4
+            *(ptr+3) = 0xafb90000;      //sw t9,0(sp)
+        }
+        else {
+            *(ptr+2) = 0x10000005;      //beq r0, r0,5
+            *(ptr+3) = 0x00000000;      //nop 
+        }
     }
 
     void movz(const Register &rd, const Register &rs, const Register &rt)

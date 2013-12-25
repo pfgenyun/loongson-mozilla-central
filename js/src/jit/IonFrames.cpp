@@ -89,7 +89,13 @@ IonFrameIterator::checkInvalidation(IonScript **ionScriptOut) const
         return false;
 
     int32_t invalidationDataOffset = ((int32_t *) returnAddr)[-1];
-    uint8_t *ionScriptDataOffset = returnAddr + invalidationDataOffset + 8; // by wangqing.
+
+#ifdef JS_CPU_MIPS
+    uint8_t *ionScriptDataOffset = returnAddr + invalidationDataOffset + 8;  // mips, by wangqing, 2013-12-5
+#else
+    uint8_t *ionScriptDataOffset = returnAddr + invalidationDataOffset;  // x86,arm,others, by huangwenjun, 2013-12-5
+#endif
+
     IonScript *ionScript = (IonScript *) Assembler::getPointer(ionScriptDataOffset);
     JS_ASSERT(ionScript->containsReturnAddress(returnAddr));
     *ionScriptOut = ionScript;

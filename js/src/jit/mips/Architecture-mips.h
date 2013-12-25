@@ -80,8 +80,11 @@ public:
         (1 << JSC::MIPSRegisters::s7);
 
 
-
-    static const uint32_t WrapperMask = VolatileMask;
+    //author:huangwenjun date:2013-12-23
+    static const uint32_t WrapperMask = 
+        VolatileMask |
+        (1 << JSC::MIPSRegisters::v0) | // = outReg
+        (1 << JSC::MIPSRegisters::v1);  // = argBase
 #if 0
     static const uint32_t WrapperMask =
         VolatileMask |         // = arguments

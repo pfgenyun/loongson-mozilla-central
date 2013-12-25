@@ -4644,6 +4644,10 @@ CopyStringChars(MacroAssembler &masm, Register to, Register from, Register len, 
     masm.addPtr(Imm32(2), from);
     masm.addPtr(Imm32(2), to);
     masm.sub32(Imm32(1), len);
+    //edit by QuQiuwen
+#if defined(JS_CPU_MIPS)
+    masm.cmpl(len,zero);
+#endif
     masm.j(Assembler::NonZero, &start);
 }
 

@@ -69,7 +69,7 @@ MacroAssemblerMIPS::offsetFromPCToV0(int offset){
     m_assembler.addiu(MIPSRegisters::v0, MIPSRegisters::v0, offset);
 }
 
-//hwj
+//author:huangwenjun date:2013-12-13
 void
 MacroAssemblerMIPS::skipOffsetFromPCToV0(int offset){
     unsigned lw, hg;

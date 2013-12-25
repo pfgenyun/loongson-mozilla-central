@@ -61,7 +61,9 @@ class XULInfo:
 
         # Read the values.
         val_re = re.compile(r'(TARGET_XPCOM_ABI|OS_TARGET|MOZ_DEBUG)\s*=\s*(.*)')
-        kw = { 'isdebug': False }
+        #kw = { 'isdebug': False }      //x86
+        kw = {}
+        kw['abi']='O32' # hwj   date: 2013-11-18
         for line in open(path):
             m = val_re.match(line)
             if m:

@@ -419,7 +419,6 @@ class RepatchLabel
     bool used() const {
         return !bound() && offset_ != (INVALID_OFFSET);
     }
-
 };
 // An absolute label is like a Label, except it represents an absolute
 // reference rather than a relative one. Thus, it cannot be patched until after
@@ -428,9 +427,17 @@ struct AbsoluteLabel : public LabelBase
 {
   public:
     AbsoluteLabel()
-    { }
+    {
+#ifdef JS_CPU_MIPS
+        type = 0;//author:huangwenjun date:2013-12-13
+#endif
+    }
     AbsoluteLabel(const AbsoluteLabel &label) : LabelBase(label)
-    { }
+    {
+#ifdef JS_CPU_MIPS
+        type = label.type;//author:huangwenjun date:2013-12-13
+#endif
+    }    
     int32_t prev() const {
         JS_ASSERT(!bound());
         if (!used())
@@ -446,6 +453,18 @@ struct AbsoluteLabel : public LabelBase
         // These labels cannot be used after being bound.
         offset_ = -1;
     }
+#ifdef JS_CPU_MIPS
+    void setType(int myType){
+        type = myType;
+    }
+    int getType() {
+        return type;
+    }
+  private:
+    int type;//default mov 0 hwj
+    //0:move
+    //1:jump table
+#endif
 };
 
 // A code label contains an absolute reference to a point in the code

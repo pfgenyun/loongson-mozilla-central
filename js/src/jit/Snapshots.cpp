@@ -176,9 +176,9 @@ static const uint32_t MAX_TYPE_FIELD_VALUE = 7;
 static const uint32_t MAX_REG_FIELD_VALUE         = 63;
 static const uint32_t ESC_REG_FIELD_INDEX         = 63;
 static const uint32_t ESC_REG_FIELD_CONST         = 62;
+static const uint32_t MIN_REG_FIELD_ESC           = 62;//author:huangwenjun date:2013-12-23
 static const uint32_t ESC_REG_FIELD_FLOAT32_STACK = 61;
 static const uint32_t ESC_REG_FIELD_FLOAT32_REG   = 60;
-static const uint32_t MIN_REG_FIELD_ESC           = 60;
 #else
 static const uint32_t MAX_REG_FIELD_VALUE         = 31;
 static const uint32_t ESC_REG_FIELD_INDEX         = 31;
