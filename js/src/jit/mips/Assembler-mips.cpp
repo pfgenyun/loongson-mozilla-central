@@ -246,10 +246,6 @@ void
 Assembler::zerod(const FloatRegister &src) {
     mcss.zeroDouble(mFPRegisterID(src.code()));
 }
-void
-Assembler::negd(const FloatRegister &src, const FloatRegister &dest) {
-    mcss.negDouble(mFPRegisterID(src.code()), mFPRegisterID(dest.code()));
-}
 
 void
 Assembler::retn(Imm32 n) {

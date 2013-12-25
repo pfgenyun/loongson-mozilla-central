@@ -577,6 +577,12 @@ public:
         emitInst(0x46200006 | (fd << OP_SH_FD) | (fs << OP_SH_FS));
     }
 
+    // add by wangqing, 2013-12-25
+    void movs(FPRegisterID fd, FPRegisterID fs)
+    {
+        emitInst(0x46000006 | (fd << OP_SH_FD) | (fs << OP_SH_FS));
+    }
+
     void addd(FPRegisterID fd, FPRegisterID fs, FPRegisterID ft)
     {
         emitInst(0x46200000 | (fd << OP_SH_FD) | (fs << OP_SH_FS)
@@ -1042,8 +1048,6 @@ public:
     static void *getRel32Target(void* where);
 
     static void *getPointer(void* where);
-
-    static void **getPointerRef(void* where);
 
     static void setRel32(void* from, void* to);
 
