@@ -3084,7 +3084,7 @@ public:
         convertInt32ToDouble(dest, fpTemp);
         failureCases.append(branchDouble(DoubleNotEqualOrUnordered, fpTemp, src));
     }
-/*
+    
     void zeroDouble(FPRegisterID dest)
     {
 #if WTF_MIPS_ISA_REV(2) && WTF_MIPS_FP64
@@ -3095,7 +3095,8 @@ public:
         m_assembler.mtc1(MIPSRegisters::zero, FPRegisterID(dest + 1));
 #endif
     }
-*/   
+
+
     //ion helper
     void truncateDoubleToInt32(FPRegisterID src, RegisterID dest)
     {

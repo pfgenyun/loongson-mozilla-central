@@ -52,7 +52,11 @@ MacroAssemblerMIPS::loadConstantDouble(double d, const FloatRegister &dest)
         return;
 //    masm.movsd_mr(reinterpret_cast<const void *>(dbl->uses.prev()), dest.code());
     mcss.loadDouble(reinterpret_cast<const void *>(dbl->uses.prev()), dest.code());
-    dbl->uses.setPrev(masm.size());
+ 
+    //author:huangwenjun date:2013-12-23
+    //dbl->uses.setPrev(masm.size());
+    mov(&(dbl->uses), addrTempRegister);
+    ldc1(dest,addrTempRegister,ImmWord((uintptr_t)((void*)0)));
 }
 
 void
@@ -268,7 +272,23 @@ MacroAssemblerMIPS::callWithABIPost(uint32_t stackAdjust, Result result)
 
     JS_ASSERT(inCall_);
     inCall_ = false;*/
+    freeStack(stackAdjust);
+    if (result == DOUBLE) {
+    //xsb:the result has been in f0,due to O32 ABI
+    //and we set ReturnFloatReg=f0
+    //so we don't need to move result from f0 to ReturnFloatReg
+    }
+    if (result == FLOAT) {
+    }
+
+    if (dynamicAlignment_)
+        pop(sp);
+
+    JS_ASSERT(inCall_);
+    inCall_ = false;
 }
+
+/*
 void
 MacroAssemblerMIPS::callWithABI(void *fun, Result result)
 {
@@ -332,24 +352,42 @@ MacroAssemblerMIPS::callWithABI(void *fun, Result result)
     JS_ASSERT(inCall_);
     inCall_ = false;
 }
+*/
 
+//author:huangwenjun date:2013-12-24
+void
+MacroAssemblerMIPS::callWithABI(void *fun, Result result)
+{
+    uint32_t stackAdjust;
+    callWithABIPre(&stackAdjust);
+    ma_call(ImmWord(uintptr_t(fun)));
+    callWithABIPost(stackAdjust, result);
+}
+
+//author:huangwenjun date:2013-12-24
 // New function
+// need check
 void
 MacroAssemblerMIPS::callWithABI(AsmJSImmPtr fun, Result result)
 {
+    JS_ASSERT(0);
+    /*
     uint32_t stackAdjust;
     callWithABIPre(&stackAdjust);
     call(fun);
     callWithABIPost(stackAdjust, result);
+    */
 }
 
+//author:huangwenjun date:2013-12-24
 // New function
 void
 MacroAssemblerMIPS::callWithABI(const Address &fun, Result result)
 {
     uint32_t stackAdjust;
     callWithABIPre(&stackAdjust);
-    call(Operand(fun));
+
+    ma_call(Operand(fun));
     callWithABIPost(stackAdjust, result);
 }
 
