@@ -3347,9 +3347,12 @@ class Assembler
 //        masm.roundss_rr(src.code(), dest.code(), mode);
         mcss.floorFloat(src.code(), dest.code());
     }
+    
+    //author:huangwenjun date:2013-12-25
+    //modify:xueshuangbai
     // New function
-    void fisttp(const Operand &dest) {
-        ASSERT(0);
+    //void fisttp(const Operand &dest) {
+    //    ASSERT(0);
         //JS_ASSERT(HasSSE3());
         //switch (dest.kind()) {
         //  case Operand::MEM_REG_DISP:
@@ -3358,31 +3361,36 @@ class Assembler
         //  default:
         //    MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         //}
-    }
+    //}
+    
+    //author:huangwenjun date:2013-12-25
+    //modify:xueshuangbai
     // New function
-    void fld(const Operand &dest) {
-        ASSERT(0);
-        switch (dest.kind()) {
-          case Operand::MEM_REG_DISP:
+    // void fld(const Operand &dest) {
+    //     ASSERT(0);
+    //    switch (dest.kind()) {
+    //      case Operand::MEM_REG_DISP:
             //masm.fld_m(dest.disp(), dest.base());
-            push(dest); // by wangqing
-            break;
-          default:
-            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
-        }
-    }
-
+    //        push(dest); // by wangqing
+    //        break;
+    //      default:
+    //        MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
+    //    }
+   // }
+    
+    //author:huangwenjun date:2013-12-25
+    //modify by xueshuanbai
     // New function
-    void fstp(const Operand &src) {
-        ASSERT(0);
-        switch (src.kind()) {
-          case Operand::MEM_REG_DISP:
-            //masm.fstp_m(src.disp(), src.base());
-            break;
-          default:
-            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
-        }
-    }
+//    void fstp(const Operand &src) {
+//        ASSERT(0);
+//        switch (src.kind()) {
+//          case Operand::MEM_REG_DISP:
+//            //masm.fstp_m(src.disp(), src.base());
+//            break;
+//          default:
+//            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
+//        }
+//    }
 
     // Defined for compatibility with ARM's assembler
     uint32_t actualOffset(uint32_t x) {
