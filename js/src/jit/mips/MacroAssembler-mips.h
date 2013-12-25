@@ -1495,12 +1495,13 @@ class MacroAssemblerMIPS : public Assembler
     void zeroFloat32(FloatRegister reg) {
         xorps(reg, reg);
     }
-    // by wangqing, 2013-11-06 make the FloatRegister negated.
+    // by wangqing, 2013-11-06 make the DoubleRegister negated.
     void negateDouble(FloatRegister reg) {
         negd(reg, reg);
     }
+    // by wangqing, 2013-12-25 make the FloatRegister negated.
     void negateFloat(FloatRegister reg) {
-        ASSERT(0);
+        negs(reg, reg);
     }
     void addDouble(FloatRegister src, FloatRegister dest) {
         addsd(src, dest);

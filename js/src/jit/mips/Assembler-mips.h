@@ -3801,6 +3801,12 @@ class Assembler
         masm.negd(fd.code(), fs.code());
     }
     
+    // add by wangqing
+    void negs(const FloatRegister &fd, const FloatRegister &fs)
+    {
+        masm.negs(fd.code(), fs.code());
+    }
+
     void lwc1(const FloatRegister &ft, const Register &rs, ImmWord offset)
     {
         masm.lwc1(ft.code(), rs.code(), offset.value);

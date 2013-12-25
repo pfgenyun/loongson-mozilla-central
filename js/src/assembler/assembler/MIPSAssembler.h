@@ -640,6 +640,12 @@ public:
         emitInst(0x46200007 | (fd << OP_SH_FD) | (fs << OP_SH_FS));
     }
 
+    // add by wangqing, 2013-12-25
+    void negs(FPRegisterID fd, FPRegisterID fs)
+    {
+        emitInst(0x46000007 | (fd << OP_SH_FD) | (fs << OP_SH_FS));
+    }
+
     void absd(FPRegisterID fd, FPRegisterID fs)
     {
         emitInst(0x46200005 | (fd << OP_SH_FD) | (fs << OP_SH_FS));
