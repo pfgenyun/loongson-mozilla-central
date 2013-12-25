@@ -199,9 +199,9 @@ class Operand
 
   private:
     Kind kind_ : 4;
-    int32_t base_ : 5;
+    int32_t base_ : 6;   // fixme: by wangqing
     Scale scale_ : 3;
-    int32_t index_ : 5;
+    int32_t index_ : 6;  // fixme: by wangqing
     int32_t disp_;
 
   public:
@@ -1739,6 +1739,13 @@ class Assembler
         //masm.movsd_rm(src.code(), dest.offset, dest.base.code(), dest.index.code(), dest.scale);
         movsd(src, Operand(dest));
     }
+
+    // by wangqing, 2013-11-08
+    void movss(const Register &src, const FloatRegister &dest) {
+        mtc1(src, dest);
+        cvtds(dest, dest);
+    }
+
     void movss(const FloatRegister &src, const Operand &dest) {
         switch (dest.kind()) {
           case Operand::MEM_REG_DISP:
@@ -2872,32 +2879,41 @@ class Assembler
     void movmskpd(const FloatRegister &src, const Register &dest) {
      //   JS_ASSERT(HasSSE2());
     //    masm.movmskpd_rr(src.code(), dest.code());
-        masm.dmfc1(mRegisterID(src.code()), mFPRegisterID(dest.code()));
-    masm.dsrl32(mRegisterID(dest.code()), mRegisterID(dest.code()), 31);
+        // fix me: by wangqing
+        dmfc1(dest, src);
+        dsrl32(dest, dest, 31);
     }
-    // New function
+
     void movmskps(const FloatRegister &src, const Register &dest) {
-        JS_ASSERT(0);
+        //JS_ASSERT(0);
 //        JS_ASSERT(HasSSE2());
 //        masm.movmskps_rr(src.code(), dest.code());
+        // fix me; by wangqing
+        dmfc1(dest, src);
     }
+
    void ptest(const FloatRegister &lhs, const FloatRegister &rhs) {
   ASSERT(0);
    /*     JS_ASSERT(HasSSE41());
         masm.ptest_rr(rhs.code(), lhs.code());*/
     }
+
     void ucomisd(const FloatRegister &lhs, const FloatRegister &rhs) {
      //   JS_ASSERT(HasSSE2());
    //     masm.ucomisd_rr(rhs.code(), lhs.code());
-     mcss.moveDouble(lhs.code(), fpTempRegister.code());
-     mcss.moveDouble(rhs.code(), fpTemp2Register.code());
+        mcss.moveDouble(lhs.code(), fpTempRegister.code());
+        mcss.moveDouble(rhs.code(), fpTemp2Register.code());
     }
+
     // New function
     void ucomiss(const FloatRegister &lhs, const FloatRegister &rhs) {
-        JS_ASSERT(0);
+        //JS_ASSERT(0);
 //        JS_ASSERT(HasSSE2());
 //        masm.ucomiss_rr(rhs.code(), lhs.code());
+        mcss.moveFloat(lhs.code(), fpTempRegister.code());
+        mcss.moveFloat(lhs.code(), fpTempRegister.code());
     }
+
     void pcmpeqw(const FloatRegister &lhs, const FloatRegister &rhs) {
    ASSERT(0);
     /*  JS_ASSERT(HasSSE2());
@@ -2915,13 +2931,14 @@ class Assembler
 //ok        masm.addsd_rr(src.code(), dest.code());
         mcss.addDouble(src.code(), dest.code());
     }
-    // New function
+
     void addss(const FloatRegister &src, const FloatRegister &dest) {
         //JS_ASSERT(0);
 //        JS_ASSERT(HasSSE2());
 //        masm.addss_rr(src.code(), dest.code());
         mcss.addFloat(src.code(), dest.code());
     }
+
     void addsd(const Operand &src, const FloatRegister &dest) {
         switch (src.kind()) {
           case Operand::FPREG:
@@ -2940,7 +2957,7 @@ class Assembler
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
-    // New function
+
     void addss(const Operand &src, const FloatRegister &dest) {
         //JS_ASSERT(0);
 //        JS_ASSERT(HasSSE2());
@@ -2961,11 +2978,12 @@ class Assembler
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
+
     void subsd(const FloatRegister &src, const FloatRegister &dest) {
 //ok        masm.subsd_rr(src.code(), dest.code());
         mcss.subDouble(src.code(), dest.code());
     }
-    // New function
+
     void subss(const FloatRegister &src, const FloatRegister &dest) {
         //JS_ASSERT(0);
         //JS_ASSERT(HasSSE2());
@@ -2987,7 +3005,7 @@ class Assembler
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
-    // New function
+
     void subss(const Operand &src, const FloatRegister &dest) {
         //JS_ASSERT(0);
 //        JS_ASSERT(HasSSE2());
@@ -3004,10 +3022,12 @@ class Assembler
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
+
     void mulsd(const FloatRegister &src, const FloatRegister &dest) {
 //ok        masm.mulsd_rr(src.code(), dest.code());
         mcss.mulDouble(src.code(), dest.code());
     }
+
     void mulsd(const Operand &src, const FloatRegister &dest) {
         switch (src.kind()) {
           case Operand::FPREG:
@@ -3022,7 +3042,7 @@ class Assembler
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
-    // New function
+
     void mulss(const Operand &src, const FloatRegister &dest) {
         //JS_ASSERT(0);
 //        JS_ASSERT(HasSSE2());
@@ -3039,24 +3059,26 @@ class Assembler
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
-    // New function
+
     void mulss(const FloatRegister &src, const FloatRegister &dest) {
         //JS_ASSERT(0);
 //        JS_ASSERT(HasSSE2());
         //masm.mulss_rr(src.code(), dest.code());
         mcss.mulFloat(src.code(), dest.code());
     }
+
     void divsd(const FloatRegister &src, const FloatRegister &dest) {
 //ok        masm.divsd_rr(src.code(), dest.code());
         mcss.divDouble(src.code(), dest.code());
     }
-    // New function
+
     void divss(const FloatRegister &src, const FloatRegister &dest) {
         //JS_ASSERT(0);
 //        JS_ASSERT(HasSSE2());
         //masm.divss_rr(src.code(), dest.code());
         mcss.divFloat(src.code(), dest.code());
     }
+
     void divsd(const Operand &src, const FloatRegister &dest) {
         switch (src.kind()) {
           case Operand::FPREG:
@@ -3071,7 +3093,7 @@ class Assembler
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
-    // New function
+
     void divss(const Operand &src, const FloatRegister &dest) {
         //JS_ASSERT(0);
 //        JS_ASSERT(HasSSE2());
@@ -3088,9 +3110,10 @@ class Assembler
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
+
     void zerod(const FloatRegister &src);
+    void zeros(const FloatRegister &src);
     void absd(const FloatRegister &src);
-    void negd(const FloatRegister &src, const FloatRegister &dest);
     void xorpd(const FloatRegister &src, const FloatRegister &dest) {
           //ASSERT(0);
    //     JS_ASSERT(HasSSE2());
@@ -3098,10 +3121,11 @@ class Assembler
         ASSERT(src.code() == dest.code());
         zerod(src);
     }
-    // New function
+
     void xorps(const FloatRegister &src, const FloatRegister &dest) {
         //JS_ASSERT(HasSSE2());
         //masm.xorps_rr(src.code(), dest.code());
+        // fix me: by wangqing
         ASSERT(src.code() == dest.code());
         zerod(src);
     }
@@ -3769,6 +3793,12 @@ class Assembler
     void divs(const FloatRegister &fd, const FloatRegister &fs, const FloatRegister &ft)
     {
         masm.divs(fd.code(), fs.code(), ft.code());
+    }
+
+    // add by wangqing
+    void negd(const FloatRegister &fd, const FloatRegister &fs)
+    {
+        masm.negd(fd.code(), fs.code());
     }
     
     void lwc1(const FloatRegister &ft, const Register &rs, ImmWord offset)

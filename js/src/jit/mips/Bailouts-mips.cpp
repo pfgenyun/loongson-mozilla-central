@@ -23,6 +23,7 @@ namespace jit {
 class BailoutStack
 {
     uintptr_t frameClassId_;
+    uintptr_t padding;     // define the padding. by xsb
     mozilla::Array<double, FloatRegisters::Total> fpregs_;
     mozilla::Array<uintptr_t, Registers::Total> regs_;
     union {

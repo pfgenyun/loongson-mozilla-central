@@ -419,6 +419,11 @@ public:
         }
 
         bool isSet() const { return m_jmp.isSet(); }
+        
+        //author: huangwenjun date:2013-12-23
+        JmpSrc getJmpSrc() {
+            return m_jmp;
+        }
 
 	// modify private to public. by wangqing
         JmpSrc m_jmp;

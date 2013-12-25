@@ -1495,8 +1495,9 @@ class MacroAssemblerMIPS : public Assembler
     void zeroFloat32(FloatRegister reg) {
         xorps(reg, reg);
     }
+    // by wangqing, 2013-11-06 make the FloatRegister negated.
     void negateDouble(FloatRegister reg) {
-        ASSERT(0);
+        negd(reg, reg);
     }
     void negateFloat(FloatRegister reg) {
         ASSERT(0);
@@ -1521,6 +1522,11 @@ class MacroAssemblerMIPS : public Assembler
     }
     void moveFloatAsDouble(const Register &src, FloatRegister dest) {
         movd(src, dest);
+        cvtss2sd(dest, dest);
+    }
+    // add by wangqing. 2013-12-25
+    void loadFloatAsDouble(const Register &src, FloatRegister dest) {
+        movss(src, dest);
         cvtss2sd(dest, dest);
     }
     void loadFloatAsDouble(const Address &src, FloatRegister dest) {
