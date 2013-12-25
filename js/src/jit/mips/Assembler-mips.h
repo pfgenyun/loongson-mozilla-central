@@ -2870,14 +2870,14 @@ class Assembler
 //ok        masm.cvttsd2si_rr(src.code(), dest.code());
         mcss.truncateDoubleToInt32(src.code(), dest.code());
     }
-    // New function
+
     void cvttss2si(const FloatRegister &src, const Register &dest) {
         //JS_ASSERT(0);
         mcss.truncateFloatToInt32(src.code(), dest.code());
 //        JS_ASSERT(HasSSE2());
 //        masm.cvttss2si_rr(src.code(), dest.code());
     }
-    // New function
+
     void cvtsi2ss(const Operand &src, const FloatRegister &dest) {
         //JS_ASSERT(0);
 //        JS_ASSERT(HasSSE2());
@@ -2898,17 +2898,19 @@ class Assembler
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
-    // New function
+
     void cvtsi2ss(const Register &src, const FloatRegister &dest) {
         //JS_ASSERT(0);
         //JS_ASSERT(HasSSE2());
         //masm.cvtsi2ss_rr(src.code(), dest.code());
         mcss.convertInt32ToFloat(src.code(), dest.code());
     }
+
     void cvtsi2sd(const Register &src, const FloatRegister &dest) {
 //ok        masm.cvtsi2sd_rr(src.code(), dest.code());
         mcss.convertInt32ToDouble(src.code(), dest.code());
     }
+
     void movmskpd(const FloatRegister &src, const Register &dest) {
      //   JS_ASSERT(HasSSE2());
     //    masm.movmskpd_rr(src.code(), dest.code());
@@ -3146,7 +3148,6 @@ class Assembler
 
     void zerod(const FloatRegister &src);
     void zeros(const FloatRegister &src);
-    void absd(const FloatRegister &src);
     void xorpd(const FloatRegister &src, const FloatRegister &dest) {
           //ASSERT(0);
    //     JS_ASSERT(HasSSE2());
@@ -3199,7 +3200,7 @@ class Assembler
     //    masm.roundsd_rr(src.code(), dest.code(), mode);
         mcss.floorDouble(src.code(), dest.code());
     }
-    // New function
+
     void roundss(const FloatRegister &src, const FloatRegister &dest)
                  //JSC::X86Assembler::RoundingMode mode)
     {
@@ -3207,58 +3208,6 @@ class Assembler
 //        JS_ASSERT(HasSSE41());
 //        masm.roundss_rr(src.code(), dest.code(), mode);
         mcss.floorFloat(src.code(), dest.code());
-    }
-    // New function
-    void minsd(const FloatRegister &src, const FloatRegister &dest) {
-        JS_ASSERT(0);
-        //JS_ASSERT(HasSSE2());
-        //masm.minsd_rr(src.code(), dest.code());
-        //mcss.minDouble(src.code(), dest.code());
-        
-    }
-    // New function
-    void minsd(const Operand &src, const FloatRegister &dest) {
-        JS_ASSERT(0);
-        //JS_ASSERT(HasSSE2());
-        /*
-        switch (src.kind()) {
-          case Operand::FPREG:
-        //    masm.minsd_rr(src.fpu(), dest.code());
-        //
-            mcss.minDouble(src.fpu(), dest.code());
-            break;
-          case Operand::MEM_REG_DISP:
-        //    masm.minsd_mr(src.disp(), src.base(), dest.code());
-            mcss.minDouble(src.disp(), src.base(), dest.code());
-            break;
-          default:
-            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
-        }*/
-    }
-    // New function
-    void maxsd(const FloatRegister &src, const FloatRegister &dest) {
-        JS_ASSERT(0);
-        //JS_ASSERT(HasSSE2());
-        //masm.maxsd_rr(src.code(), dest.code());
-        //mcss.maxDouble(src.code(), dest.code());
-    }
-    // New function
-    void maxsd(const Operand &src, const FloatRegister &dest) {
-        JS_ASSERT(0);
-        //JS_ASSERT(HasSSE2());
-        /*
-        switch (src.kind()) {
-          case Operand::FPREG:
-        //    masm.maxsd_rr(src.fpu(), dest.code());
-            mcss.maxDouble(src.fpu(), dest.code());
-            break;
-          case Operand::MEM_REG_DISP:
-        //    masm.maxsd_mr(src.disp(), src.base(), dest.code());
-            mcss.maxDouble(src.disp(), src.base(), dest.code());
-            break;
-          default:
-            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
-        }*/
     }
     // New function
     void fisttp(const Operand &dest) {
@@ -3284,6 +3233,7 @@ class Assembler
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
+
     // New function
     void fstp(const Operand &src) {
         ASSERT(0);
@@ -3326,7 +3276,7 @@ class Assembler
 
     static void patchWrite_Imm32(CodeLocationLabel dataLabel, Imm32 toWrite) {
      //   *((int32_t *) dataLabel.raw() - 1) = toWrite.value;
-         JSC::MIPSAssembler::setInt32((int32_t *) dataLabel.raw(), toWrite.value);
+         JSC::MIPSAssembler::setInt32((int32_t *) dataLabel.raw() - 1, toWrite.value);
     }
 
     static void patchDataWithValueCheck(CodeLocationLabel data, PatchedImmPtr newData,
@@ -3838,6 +3788,12 @@ class Assembler
     void negs(const FloatRegister &fd, const FloatRegister &fs)
     {
         masm.negs(fd.code(), fs.code());
+    }
+
+    // add by wangqing
+    void absd(const FloatRegister &fd, const FloatRegister &fs)               
+    {   
+        masm.absd(fd.code(), fs.code());                                      
     }
 
     void lwc1(const FloatRegister &ft, const Register &rs, ImmWord offset)

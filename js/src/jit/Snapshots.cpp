@@ -195,7 +195,13 @@ SnapshotReader::readSlot()
     IonSpew(IonSpew_Snapshots, "Reading slot %u", slotsRead_);
     slotsRead_++;
 
+#if defined(JS_CPU_X86) || defined(JS_CPU_X64) || defined(JS_CPU_ARM)
     uint8_t b = reader_.readByte();
+#elif defined(JS_CPU_MIPS)
+    uint16_t b = reader_.readFixedUint16_t();
+#else
+    error "CPU Not Supported"
+#endif
 
     JSValueType type = JSValueType(b & 0x7);
     uint32_t code = b >> 3;
@@ -359,8 +365,15 @@ SnapshotWriter::writeSlotHeader(JSValueType type, uint32_t regCode)
     JS_ASSERT(uint32_t(regCode) <= MAX_REG_FIELD_VALUE);
     JS_STATIC_ASSERT(Registers::Total < MIN_REG_FIELD_ESC);
 
+#if defined(JS_CPU_X86) || defined(JS_CPU_X64) || defined(JS_CPU_ARM)
     uint8_t byte = uint32_t(type) | (regCode << 3);
     writer_.writeByte(byte);
+#elif defined(JS_CPU_MIPS)
+    uint16_t byte = uint32_t(type) | (regCode << 3);
+    writer_.writeFixedUint16_t(byte);
+#else
+    error "CPU Not Supported"
+#endif
 
     slotsWritten_++;
     JS_ASSERT(slotsWritten_ <= nslots_);

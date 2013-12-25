@@ -476,7 +476,9 @@ MacroAssemblerMIPS::testNegativeZero(const FloatRegister &reg, const Register &s
     branchDouble(DoubleNotEqual, reg, ScratchFloatReg, &nonZero);
 
     // Input register is either zero or negative zero. Test sign bit.
-    movmskpd(reg, scratch);
+    // by wangqing
+    mfc1(scratch, js::jit::FloatRegister::FromCode(reg.code() + 1));
+    shrl(Imm32(0x1f), scratch);
     // If reg is -0, then a test of Zero is true.
     cmpl(scratch, Imm32(1));
 

@@ -6,7 +6,6 @@
 
 #include "jit/mips/CodeGenerator-mips.h"
 
-// From jit/shared/CodeGenerator-x86-shared.cpp
 #include "mozilla/DebugOnly.h"
 #include "mozilla/MathAlgorithms.h"
 
@@ -15,7 +14,6 @@
 #include "jit/RangeAnalysis.h"
 #include "jit/shared/CodeGenerator-shared-inl.h"
 
-// From jit/x86/CodeGenerator-x86.cpp
 #include "jsnum.h"
 #include "jit/ExecutionModeInlines.h"
 #include "jit/IonCaches.h"
@@ -467,11 +465,11 @@ class BailoutJump {
   public:
     BailoutJump(Assembler::Condition cond) : cond_(cond)
     { }
-//#ifdef JS_CPU_X86
+#ifdef JS_CPU_X86
     void operator()(MacroAssembler &masm, uint8_t *code) const {
         masm.j(cond_, ImmPtr(code), Relocation::HARDCODED);
     }
-//#endif
+#endif
     void operator()(MacroAssembler &masm, Label *label) const {
         masm.j(cond_, label);
     }
@@ -483,11 +481,11 @@ class BailoutLabel {
   public:
     BailoutLabel(Label *label) : label_(label)
     { }
-//#ifdef JS_CPU_X86
+#ifdef JS_CPU_X86
     void operator()(MacroAssembler &masm, uint8_t *code) const {
         masm.retarget(label_, ImmPtr(code), Relocation::HARDCODED);
     }
-//#endif
+#endif
     void operator()(MacroAssembler &masm, Label *label) const {
         masm.retarget(label_, label);
     }
@@ -521,7 +519,7 @@ CodeGeneratorMIPS::bailout(const T &binder, LSnapshot *snapshot)
     JS_ASSERT_IF(frameClass_ != FrameSizeClass::None() && deoptTable_,
                  frameClass_.frameSize() == masm.framePushed());
 
-//#ifdef JS_CPU_X86
+#ifdef JS_CPU_X86
     // On x64, bailout tables are pointless, because 16 extra bytes are
     // reserved per external jump, whereas it takes only 10 bytes to encode a
     // a non-table based bailout.
@@ -529,7 +527,7 @@ CodeGeneratorMIPS::bailout(const T &binder, LSnapshot *snapshot)
         binder(masm, deoptTable_->raw() + snapshot->bailoutId() * BAILOUT_TABLE_ENTRY_SIZE);
         return true;
     }
-//#endif
+#endif
 
     // We could not use a jump table, either because all bailout IDs were
     // reserved, or a jump table is not optimal for this frame size or
@@ -704,9 +702,9 @@ CodeGeneratorMIPS::visitAbsD(LAbsD *ins)
 {
     FloatRegister input = ToFloatRegister(ins->input());
     JS_ASSERT(input == ToFloatRegister(ins->output()));
-    // Load a value which is all ones except for the sign bit.
-    masm.loadConstantDouble(SpecificNaN(0, DoubleSignificandBits), ScratchFloatReg);
-    masm.andpd(ScratchFloatReg, input);
+
+    //by weizhenwei, 2013.11.08
+    masm.absd(input, input);
     return true;
 }
 
@@ -1037,6 +1035,9 @@ CodeGeneratorMIPS::visitMulNegativeZeroCheck(MulNegativeZeroCheck *ool)
     // Result is -0 if lhs or rhs is negative.
     masm.movl(lhsCopy, result);
     masm.orl(rhs, result);
+    // fix me: by wangqing
+    masm.movl(result, cmpTempRegister);
+    masm.movl(zero, cmpTemp2Register);
     if (!bailoutIf(Assembler::Signed, ins->snapshot()))
         return false;
 
@@ -1681,20 +1682,7 @@ CodeGeneratorMIPS::visitFloor(LFloor *lir)
     FloatRegister scratch = ScratchFloatReg;
     Register output = ToRegister(lir->output());
 
-    /*if (AssemblerX86Shared::HasSSE41()) {
-        // Bail on negative-zero.
-        Assembler::Condition bailCond = masm.testNegativeZero(input, output);
-        if (!bailoutIf(bailCond, lir->snapshot()))
-            return false;
-
-        // Round toward -Infinity.
-        masm.roundsd(input, scratch, JSC::X86Assembler::RoundDown);
-
-        masm.cvttsd2si(scratch, output);
-        masm.cmp32(output, Imm32(INT_MIN));
-        if (!bailoutIf(Assembler::Equal, lir->snapshot()))
-            return false;
-    } else */{
+    {
         Label negative, end;
 
         // Branch to a slow path for negative inputs. Doesn't catch NaN or -0.
@@ -1708,7 +1696,7 @@ CodeGeneratorMIPS::visitFloor(LFloor *lir)
 
         // Input is non-negative, so truncation correctly rounds.
         masm.cvttsd2si(input, output);
-        masm.cmp32(output, Imm32(INT_MIN));
+        masm.cmp32(output, Imm32(0x7fffffff)); // by wangqing
         if (!bailoutIf(Assembler::Equal, lir->snapshot()))
             return false;
 
@@ -1722,7 +1710,7 @@ CodeGeneratorMIPS::visitFloor(LFloor *lir)
             // Truncate and round toward zero.
             // This is off-by-one for everything but integer-valued inputs.
             masm.cvttsd2si(input, output);
-            masm.cmp32(output, Imm32(INT_MIN));
+            masm.cmp32(output, Imm32(0x7fffffff)); // by wangqing
             if (!bailoutIf(Assembler::Equal, lir->snapshot()))
                 return false;
 
@@ -1748,20 +1736,7 @@ CodeGeneratorMIPS::visitFloorF(LFloorF *lir)
     FloatRegister scratch = ScratchFloatReg;
     Register output = ToRegister(lir->output());
 
-    /*if (AssemblerX86Shared::HasSSE41()) {
-        // Bail on negative-zero.
-        Assembler::Condition bailCond = masm.testNegativeZeroFloat32(input, output);
-        if (!bailoutIf(bailCond, lir->snapshot()))
-            return false;
-
-        // Round toward -Infinity.
-        masm.roundss(input, scratch, JSC::X86Assembler::RoundDown);
-
-        masm.cvttss2si(scratch, output);
-        masm.cmp32(output, Imm32(INT_MIN));
-        if (!bailoutIf(Assembler::Equal, lir->snapshot()))
-            return false;
-    } else */{
+    {
         Label negative, end;
 
         // Branch to a slow path for negative inputs. Doesn't catch NaN or -0.
@@ -1775,7 +1750,7 @@ CodeGeneratorMIPS::visitFloorF(LFloorF *lir)
 
         // Input is non-negative, so truncation correctly rounds.
         masm.cvttss2si(input, output);
-        masm.cmp32(output, Imm32(INT_MIN));
+        masm.cmp32(output, Imm32(0x7fffffff));
         if (!bailoutIf(Assembler::Equal, lir->snapshot()))
             return false;
 
@@ -1789,7 +1764,7 @@ CodeGeneratorMIPS::visitFloorF(LFloorF *lir)
             // Truncate and round toward zero.
             // This is off-by-one for everything but integer-valued inputs.
             masm.cvttss2si(input, output);
-            masm.cmp32(output, Imm32(INT_MIN));
+            masm.cmp32(output, Imm32(0x7fffffff));
             if (!bailoutIf(Assembler::Equal, lir->snapshot()))
                 return false;
 
@@ -1836,7 +1811,7 @@ CodeGeneratorMIPS::visitRound(LRound *lir)
     masm.addsd(input, temp);
 
     masm.cvttsd2si(temp, output);
-    masm.cmp32(output, Imm32(INT_MIN));
+    masm.cmp32(output, Imm32(0x7fffffff));
     if (!bailoutIf(Assembler::Equal, lir->snapshot()))
         return false;
 
@@ -1846,25 +1821,7 @@ CodeGeneratorMIPS::visitRound(LRound *lir)
     // Input is negative, but isn't -0.
     masm.bind(&negative);
 
-    /*if (AssemblerX86Shared::HasSSE41()) {
-        // Add 0.5 and round toward -Infinity. The result is stored in the temp
-        // register (currently contains 0.5).
-        masm.addsd(input, temp);
-        masm.roundsd(temp, scratch, JSC::X86Assembler::RoundDown);
-
-        // Truncate.
-        masm.cvttsd2si(scratch, output);
-        masm.cmp32(output, Imm32(INT_MIN));
-        if (!bailoutIf(Assembler::Equal, lir->snapshot()))
-            return false;
-
-        // If the result is positive zero, then the actual result is -0. Bail.
-        // Otherwise, the truncation will have produced the correct negative integer.
-        masm.testl(output, output);
-        if (!bailoutIf(Assembler::Zero, lir->snapshot()))
-            return false;
-
-    } else */{
+    { 
         masm.addsd(input, temp);
 
         // Round toward -Infinity without the benefit of ROUNDSD.
@@ -1877,7 +1834,7 @@ CodeGeneratorMIPS::visitRound(LRound *lir)
             // Truncate and round toward zero.
             // This is off-by-one for everything but integer-valued inputs.
             masm.cvttsd2si(temp, output);
-            masm.cmp32(output, Imm32(INT_MIN));
+            masm.cmp32(output, Imm32(0x7fffffff));
             if (!bailoutIf(Assembler::Equal, lir->snapshot()))
                 return false;
 

@@ -896,14 +896,15 @@ class MacroAssemblerMIPS : public Assembler
     void loadConstantFloat32(float f, const FloatRegister &dest);
     void addConstantFloat32(float f, const FloatRegister &dest);
 
+    // by wangqing
     void branchTruncateDouble(const FloatRegister &src, const Register &dest, Label *fail) {
         cvttsd2si(src, dest);
 
         // cvttsd2si returns 0x80000000 on failure. Test for it by
         // subtracting 1 and testing overflow (this permits the use of a
         // smaller immediate field).
-        cmpl(dest, Imm32(1));
-        j(Assembler::Overflow, fail);
+        cmpl(dest, Imm32(0x7fffffff));
+        j(Assembler::Equal, fail);
     }
     void branchTruncateFloat32(const FloatRegister &src, const Register &dest, Label *fail) {
         cvttss2si(src, dest);
@@ -911,8 +912,8 @@ class MacroAssemblerMIPS : public Assembler
         // cvttss2si returns 0x80000000 on failure. Test for it by
         // subtracting 1 and testing overflow (this permits the use of a
         // smaller immediate field).
-        cmpl(dest, Imm32(1));
-        j(Assembler::Overflow, fail);
+        cmpl(dest, Imm32(0x7fffffff));
+        j(Assembler::Equal, fail);
     }
 
     Condition testInt32Truthy(bool truthy, const ValueOperand &operand) {
@@ -1113,10 +1114,7 @@ class MacroAssemblerMIPS : public Assembler
     }
 
     void compareDouble(DoubleCondition cond, const FloatRegister &lhs, const FloatRegister &rhs) {
-        if (cond & DoubleConditionBitInvert)
-            ucomisd(rhs, lhs);
-        else
-            ucomisd(lhs, rhs);
+        ASSERT(0);
     }
 
     //by weizhenwei, 2013.12.24

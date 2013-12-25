@@ -225,10 +225,6 @@ AutoFlushCache::~AutoFlushCache()
 // The following is from jit/mips/Assembler-mips.h
 
 void
-Assembler::absd(const FloatRegister &src) {
-    mcss.absDouble(mFPRegisterID(src.code()), mFPRegisterID(src.code()));
-}
-void
 Assembler::zerod(const FloatRegister &src) {
     mcss.zeroDouble(mFPRegisterID(src.code()));
 }
