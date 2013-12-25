@@ -465,25 +465,58 @@ class Assembler
     
     //by weizhenwei, 2013.12.24
     static inline DoubleCondition DoubleConditionFromCondition(Condition cond) {
-		if ((cond == Equal) || (cond == Zero)) {
-				return DoubleEqual;
-		} else if ((cond == NotEqual) || (cond == NonZero)) {
-				return DoubleNotEqual;
-		} else if ((cond == Above) || (cond == GreaterThan)) {
-				return DoubleGreaterThan;
-		} else if ((cond == AboveOrEqual) || (cond == GreaterThanOrEqual)) {
-				return DoubleGreaterThanOrEqual;
-		} else if ((cond == Below) || (cond == LessThan)) {
-				return DoubleLessThan;
-		} else if ((cond == BelowOrEqual) || (cond == LessThanOrEqual)) {
-				return DoubleLessThanOrEqual;
-		} else if (cond == Parity) {
-				return DoubleUnordered;
-		} else if (cond == NoParity) {
-				return DoubleOrdered;
-		} else {
-				JS_ASSERT(0);
-		}
+        if ((cond == Equal) || (cond == Zero)) {
+            return DoubleEqual;
+        } else if ((cond == NotEqual) || (cond == NonZero)) {
+            return DoubleNotEqual;
+        } else if ((cond == Above) || (cond == GreaterThan)) {
+            return DoubleGreaterThan;
+        } else if ((cond == AboveOrEqual) || (cond == GreaterThanOrEqual)) {
+            return DoubleGreaterThanOrEqual;
+        } else if ((cond == Below) || (cond == LessThan)) {
+            return DoubleLessThan;
+        } else if ((cond == BelowOrEqual) || (cond == LessThanOrEqual)) {
+            return DoubleLessThanOrEqual;
+        } else if (cond == Parity) {
+            return DoubleUnordered;
+        } else if (cond == NoParity) {
+            return DoubleOrdered;
+        } else {
+            MOZ_ASSUME_UNREACHABLE("unexpected Double Condition");
+        }
+    }
+    static inline DoubleCondition InvertDoubleCondition(DoubleCondition cond) {
+        if (cond == DoubleOrdered) {
+            return DoubleUnordered;
+        } else if (cond == DoubleUnordered) {
+            return DoubleOrdered;
+        } else if (cond == DoubleEqual) {
+            return DoubleNotEqualOrUnordered;
+        } else if (cond == DoubleNotEqual) {
+            return DoubleEqualOrUnordered;
+        } else if (cond == DoubleGreaterThan) {
+            return DoubleLessThanOrEqualOrUnordered;
+        } else if (cond == DoubleGreaterThanOrEqual) {
+            return DoubleLessThanOrUnordered;
+        } else if (cond == DoubleLessThan) {
+            return DoubleGreaterThanOrEqualOrUnordered;
+        } else if (cond == DoubleLessThanOrEqual) {
+            return DoubleGreaterThanOrUnordered;
+        } else if (cond == DoubleEqualOrUnordered) {
+            return DoubleNotEqual;
+        } else if (cond == DoubleNotEqualOrUnordered) {
+            return DoubleEqual;
+        } else if (cond == DoubleGreaterThanOrUnordered) {
+            return DoubleLessThanOrEqual;
+        } else if (cond == DoubleGreaterThanOrEqualOrUnordered) {
+            return DoubleLessThan;
+        } else if (cond == DoubleLessThanOrUnordered) {
+            return DoubleGreaterThanOrEqual;
+        } else if (cond == DoubleLessThanOrEqualOrUnordered) {
+            return DoubleGreaterThan;
+        } else {
+            MOZ_ASSUME_UNREACHABLE("unexpected Double Condition");
+        }
     }
 
     static void TraceDataRelocations(JSTracer *trc, IonCode *code, CompactBufferReader &reader);
