@@ -793,13 +793,28 @@ class OutOfLineUndoALUOperation : public OutOfLineCodeBase<CodeGeneratorMIPS>
     }
 };
 
+//author:huangwenjun date:2013-12-24
 bool
 CodeGeneratorMIPS::visitAddI(LAddI *ins)
 {
+/*
     if (ins->rhs()->isConstant())
         masm.addl(Imm32(ToInt32(ins->rhs())), ToOperand(ins->lhs()));
     else
         masm.addl(ToOperand(ins->rhs()), ToRegister(ins->lhs()));
+*/
+    //edit by QuQiuwen
+    if (ins->rhs()->isConstant()){
+        masm.cmpl(ToOperand(ins->lhs()), Imm32(ToInt32(ins->rhs())));
+        masm.negl(cmpTemp2Register);
+        masm.addl(Imm32(ToInt32(ins->rhs())), ToOperand(ins->lhs()));
+    }
+    else{
+        masm.cmpl(ToOperand(ins->rhs()), ToRegister(ins->lhs()));
+        masm.negl(cmpTemp2Register);
+        masm.addl(ToOperand(ins->rhs()), ToRegister(ins->lhs()));
+    }
+    //end by QuQiuwen
 
     if (ins->snapshot()) {
         if (ins->recoversInput()) {
@@ -815,13 +830,26 @@ CodeGeneratorMIPS::visitAddI(LAddI *ins)
     return true;
 }
 
+//author:huangwenjun date:2013-12-25
 bool
 CodeGeneratorMIPS::visitSubI(LSubI *ins)
 {
+/*
     if (ins->rhs()->isConstant())
         masm.subl(Imm32(ToInt32(ins->rhs())), ToOperand(ins->lhs()));
     else
         masm.subl(ToOperand(ins->rhs()), ToRegister(ins->lhs()));
+*/
+   //edit by QuQiuwen,
+   if (ins->rhs()->isConstant()){
+        masm.cmpl(ToOperand(ins->lhs()),Imm32(ToInt32(ins->rhs())));
+        masm.subl(Imm32(ToInt32(ins->rhs())), ToOperand(ins->lhs()));
+     }
+    else{
+        masm.cmpl(ToRegister(ins->lhs()),ToOperand(ins->rhs()));
+        masm.subl(ToOperand(ins->rhs()), ToRegister(ins->lhs()));
+    }
+    //end by QuQiuwen
 
     if (ins->snapshot()) {
         if (ins->recoversInput()) {
@@ -1956,6 +1984,14 @@ CodeGeneratorMIPS::generateInvalidateEpilogue()
     // epilogue.
     for (size_t i = 0; i < sizeof(void *); i+= Assembler::nopSize())
         masm.nop();
+
+    //author:huangwenjun date:2013-12-23
+    masm.nop();
+    masm.nop();
+    masm.nop();
+    masm.nop();
+    masm.nop();
+    masm.nop();
 
     masm.bind(&invalidate_);
 

@@ -978,7 +978,9 @@ MacroAssembler::generateBailoutTail(Register scratch, Register bailoutInfo)
             GeneralRegisterSet enterMonRegs(GeneralRegisterSet::All());
             enterMonRegs.take(R0);
             enterMonRegs.take(BaselineStubReg);
-            enterMonRegs.take(BaselineFrameReg);
+#ifndef JS_CPU_MIPS
+            enterMonRegs.take(BaselineFrameReg);    //author:huangwenjun date:2013-12-23
+#endif
             enterMonRegs.takeUnchecked(BaselineTailCallReg);
 
             pop(BaselineStubReg);
@@ -1016,7 +1018,10 @@ MacroAssembler::generateBailoutTail(Register scratch, Register bailoutInfo)
             GeneralRegisterSet enterRegs(GeneralRegisterSet::All());
             enterRegs.take(R0);
             enterRegs.take(R1);
-            enterRegs.take(BaselineFrameReg);
+
+#ifndef JS_CPU_MIPS
+            enterRegs.take(BaselineFrameReg);   //author:huangwenjun date:2013-12-25
+#endif
             Register jitcodeReg = enterRegs.takeAny();
 
             pop(jitcodeReg);

@@ -1050,7 +1050,9 @@ class ICStubCompiler
         JS_ASSERT(!regs.has(BaselineTailCallReg));
         regs.take(BaselineSecondScratchReg);
 #endif
-        regs.take(BaselineFrameReg);
+#ifndef JS_CPU_MIPS
+        regs.take(BaselineFrameReg);//author:huangwenjun date:2013-12-23
+#endif
         regs.take(BaselineStubReg);
 #ifdef JS_CPU_X64
         regs.take(ExtractTemp0);

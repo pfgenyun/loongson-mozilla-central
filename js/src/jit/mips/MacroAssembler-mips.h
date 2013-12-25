@@ -635,6 +635,8 @@ class MacroAssemblerMIPS : public Assembler
     }
     void decBranchPtr(Condition cond, const Register &lhs, Imm32 imm, Label *label) {
         subPtr(imm, lhs);
+        //add by QuQiuwen
+        cmpl(lhs,zero);
         j(cond, label);
     }
 

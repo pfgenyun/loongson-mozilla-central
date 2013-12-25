@@ -53,7 +53,8 @@ def get_max_wait(tasks, results, timeout):
     """
 
     # If we have a progress-meter, we need to wake up to update it frequently.
-    wait = results.pb.update_granularity()
+    #wait = results.pb.update_granularity() #x86
+    wait = timedelta(0) #author:huangwenjun date:2013-12-23
 
     # If a timeout is supplied, we need to wake up for the first task to
     # timeout if that is sooner.
@@ -189,7 +190,8 @@ def run_all_tests(tests, results, options):
 
     while len(tests) or len(tasks):
         while len(tests) and len(tasks) < options.worker_count:
-            tasks.append(spawn_test(tests.pop(), options.passthrough))
+            tasks.append(spawn_test(tests.pop()))   #author:huangwenjun             date:2013-12-23
+            #tasks.append(spawn_test(tests.pop(), options.passthrough)) #x86
 
         timeout = get_max_wait(tasks, results, options.timeout)
         read_input(tasks, timeout)

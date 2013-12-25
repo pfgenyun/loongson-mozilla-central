@@ -36,7 +36,7 @@ static const int32_t NUNBOX32_PAYLOAD_OFFSET      = 0;
 ////
 
 // Size of each bailout table entry.
-static const uint32_t BAILOUT_TABLE_ENTRY_SIZE    = 4*11; //see to Trampoline-mips.cpp:generateBailoutTable
+static const uint32_t BAILOUT_TABLE_ENTRY_SIZE    = 4*13; //author:huangwenjun date:2013-12-23 see to Trampoline-mips.cpp:generateBailoutTable
 
 class Registers {
 public:
@@ -77,8 +77,11 @@ public:
         (1 << JSC::MIPSRegisters::s7);
 
 
-
-    static const uint32_t WrapperMask = VolatileMask;
+    //author:huangwenjun date:2013-12-23
+    static const uint32_t WrapperMask = 
+        VolatileMask |
+        (1 << JSC::MIPSRegisters::v0) | // = outReg
+        (1 << JSC::MIPSRegisters::v1);  // = argBase
 #if 0
     static const uint32_t WrapperMask =
         VolatileMask |         // = arguments
