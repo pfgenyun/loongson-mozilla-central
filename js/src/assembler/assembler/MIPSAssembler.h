@@ -650,6 +650,12 @@ public:
         emitInst(0x46200005 | (fd << OP_SH_FD) | (fs << OP_SH_FS));
     }
 
+    // add by wangqing, 2013-12-26
+    void abss(FPRegisterID fd, FPRegisterID fs)
+    {
+        emitInst(0x46000005 | (fd << OP_SH_FD) | (fs << OP_SH_FS));
+    }
+
     void lwc1(FPRegisterID ft, RegisterID rs, int offset)
     {
         emitInst(0xc4000000 | (ft << OP_SH_FT) | (rs << OP_SH_RS)
