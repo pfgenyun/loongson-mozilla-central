@@ -404,72 +404,6 @@ MacroAssemblerMIPS::callWithABIPost(uint32_t stackAdjust, Result result)
     inCall_ = false;
 }
 
-/*
-void
-MacroAssemblerMIPS::callWithABI(void *fun, Result result)
-{
-    JS_ASSERT(inCall_);
-    JS_ASSERT(args_ == passedArgs_);
-
-    uint32_t stackAdjust = ((passedArgs_ > 4) ? passedArgs_ : 4) * STACK_SLOT_SIZE;
-    if (dynamicAlignment_) {
-#if 0
-        stackAdjust = stackForCall_
-                    + ComputeByteAlignment(stackForCall_,
-                                           StackAlignment);
-#endif
-        stackAdjust += ComputeByteAlignment(stackAdjust + STACK_SLOT_SIZE, StackAlignment);
-    } else {
-        stackAdjust +=
-            ComputeByteAlignment(framePushed_ + stackAdjust, StackAlignment);
-    }
-
-    reserveStack(stackAdjust);
-//    subl(Imm32(16), StackPointer);
-
-    // Position all arguments.
-    {
-        enoughMemory_ &= moveResolver_.resolve();
-        if (!enoughMemory_)
-            return;
-
-        MoveEmitter emitter(*this);
-        emitter.emit(moveResolver_);
-        emitter.finish();
-    }
-
-#ifdef DEBUG
-    {
-        // Check call alignment.
-        Label good;
-        movl(sp, t0);
-        testl(t0, Imm32(StackAlignment - 1));
-        j(Equal, &good);
-        breakpoint();
-        bind(&good);
-    }
-#endif
-
-//ok    //ma_call
-    call(ImmPtr(fun));
-
-//    addl(Imm32(16), StackPointer);
-    freeStack(stackAdjust);
-    if (result == DOUBLE) {
-        reserveStack(sizeof(double));//申请空间
-        fstp(Operand(sp, 0));//，
-        movsd(Operand(sp, 0), ReturnFloatReg);//sp指向的值加载至ReturnFloatReg；
-        freeStack(sizeof(double));
-    }
-    if (dynamicAlignment_)
-        //pop(sp);
-        movl(Operand(sp, 0), sp);
-
-    JS_ASSERT(inCall_);
-    inCall_ = false;
-}
-*/
-
 //author:huangwenjun date:2013-12-24
 void
 MacroAssemblerMIPS::callWithABI(void *fun, Result result)
@@ -502,7 +436,6 @@ MacroAssemblerMIPS::callWithABI(const Address &fun, Result result)
 {
     uint32_t stackAdjust;
     callWithABIPre(&stackAdjust);
-
     ma_call(Operand(fun));
     callWithABIPost(stackAdjust, result);
 }
@@ -512,34 +445,35 @@ MacroAssemblerMIPS::handleFailureWithHandler(void *handler)
 {
     // Reserve space for exception information.
     subl(Imm32(sizeof(ResumeFromException)), sp);
-    movl(sp, a0);
+    movl(sp, t6);
 
     // Ask for an exception handler.
-    setupUnalignedABICall(1, v0);
-    passABIArg(a0);
+    setupUnalignedABICall(1, t8);
+    passABIArg(t6);
     callWithABI(handler);
 
     IonCode *excTail = GetIonContext()->runtime->jitRuntime()->getExceptionTail();
     jmp(excTail);
 }
 
+//author:huangwenjun date:2013-12-26
 void
 MacroAssemblerMIPS::handleFailureWithHandlerTail()
 {
-    JS_ASSERT(0);
-/*
+    //JS_ASSERT(0);
+
     Label entryFrame;
     Label catch_;
     Label finally;
     Label return_;
     Label bailout;
 
-    loadPtr(Address(esp, offsetof(ResumeFromException, kind)), eax);
-    branch32(Assembler::Equal, eax, Imm32(ResumeFromException::RESUME_ENTRY_FRAME), &entryFrame);
-    branch32(Assembler::Equal, eax, Imm32(ResumeFromException::RESUME_CATCH), &catch_);
-    branch32(Assembler::Equal, eax, Imm32(ResumeFromException::RESUME_FINALLY), &finally);
-    branch32(Assembler::Equal, eax, Imm32(ResumeFromException::RESUME_FORCED_RETURN), &return_);
-    branch32(Assembler::Equal, eax, Imm32(ResumeFromException::RESUME_BAILOUT), &bailout);
+    loadPtr(Address(sp, offsetof(ResumeFromException, kind)), t6);
+    branch32(Assembler::Equal, t6, Imm32(ResumeFromException::RESUME_ENTRY_FRAME), &entryFrame);
+    branch32(Assembler::Equal, t6, Imm32(ResumeFromException::RESUME_CATCH), &catch_);
+    branch32(Assembler::Equal, t6, Imm32(ResumeFromException::RESUME_FINALLY), &finally);
+    branch32(Assembler::Equal, t6, Imm32(ResumeFromException::RESUME_FORCED_RETURN), &return_);
+    branch32(Assembler::Equal, t6, Imm32(ResumeFromException::RESUME_BAILOUT), &bailout);
 
     breakpoint(); // Invalid kind.
 
@@ -547,48 +481,48 @@ MacroAssemblerMIPS::handleFailureWithHandlerTail()
     // and return from the entry frame.
     bind(&entryFrame);
     moveValue(MagicValue(JS_ION_ERROR), JSReturnOperand);
-    loadPtr(Address(esp, offsetof(ResumeFromException, stackPointer)), esp);
+    loadPtr(Address(sp, offsetof(ResumeFromException, stackPointer)), sp);
     ret();
 
     // If we found a catch handler, this must be a baseline frame. Restore state
     // and jump to the catch block.
     bind(&catch_);
-    loadPtr(Address(esp, offsetof(ResumeFromException, target)), eax);
-    loadPtr(Address(esp, offsetof(ResumeFromException, framePointer)), ebp);
-    loadPtr(Address(esp, offsetof(ResumeFromException, stackPointer)), esp);
-    jmp(Operand(eax));
+    loadPtr(Address(sp, offsetof(ResumeFromException, target)), t6);
+    loadPtr(Address(sp, offsetof(ResumeFromException, framePointer)), fp);
+    loadPtr(Address(sp, offsetof(ResumeFromException, stackPointer)), sp);
+    jmp(Operand(t6));
 
     // If we found a finally block, this must be a baseline frame. Push
     // two values expected by JSOP_RETSUB: BooleanValue(true) and the
     // exception.
     bind(&finally);
-    ValueOperand exception = ValueOperand(ecx, edx);
-    loadValue(Address(esp, offsetof(ResumeFromException, exception)), exception);
+    ValueOperand exception = ValueOperand(t7, t8);
+    loadValue(Address(sp, offsetof(ResumeFromException, exception)), exception);
 
-    loadPtr(Address(esp, offsetof(ResumeFromException, target)), eax);
-    loadPtr(Address(esp, offsetof(ResumeFromException, framePointer)), ebp);
-    loadPtr(Address(esp, offsetof(ResumeFromException, stackPointer)), esp);
+    loadPtr(Address(sp, offsetof(ResumeFromException, target)), t6);
+    loadPtr(Address(sp, offsetof(ResumeFromException, framePointer)), fp);
+    loadPtr(Address(sp, offsetof(ResumeFromException, stackPointer)), sp);
 
     pushValue(BooleanValue(true));
     pushValue(exception);
-    jmp(Operand(eax));
+    jmp(Operand(t6));
 
     // Only used in debug mode. Return BaselineFrame->returnValue() to the caller.
     bind(&return_);
-    loadPtr(Address(esp, offsetof(ResumeFromException, framePointer)), ebp);
-    loadPtr(Address(esp, offsetof(ResumeFromException, stackPointer)), esp);
-    loadValue(Address(ebp, BaselineFrame::reverseOffsetOfReturnValue()), JSReturnOperand);
-    movl(ebp, esp);
-    pop(ebp);
+    loadPtr(Address(sp, offsetof(ResumeFromException, framePointer)), fp);
+    loadPtr(Address(sp, offsetof(ResumeFromException, stackPointer)), sp);
+    loadValue(Address(fp, BaselineFrame::reverseOffsetOfReturnValue()), JSReturnOperand);
+    movl(fp, sp);
+    pop(fp);
     ret();
 
     // If we are bailing out to baseline to handle an exception, jump to
     // the bailout tail stub.
     bind(&bailout);
-    loadPtr(Address(esp, offsetof(ResumeFromException, bailoutInfo)), ecx);
-    movl(Imm32(BAILOUT_RETURN_OK), eax);
-    jmp(Operand(esp, offsetof(ResumeFromException, target)));
-*/
+    loadPtr(Address(sp, offsetof(ResumeFromException, bailoutInfo)), t8);
+    movl(Imm32(BAILOUT_RETURN_OK), t6);
+    jmp(Operand(sp, offsetof(ResumeFromException, target)));
+
 }
 
 void
