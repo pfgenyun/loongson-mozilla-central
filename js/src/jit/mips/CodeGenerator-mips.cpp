@@ -2643,9 +2643,12 @@ CodeGeneratorMIPS::visitAsmJSLoadFFIFunc(LAsmJSLoadFFIFunc *ins)
     return gen->noteGlobalAccess(label.offset(), mir->globalDataOffset());
 }
 
+//author:huangwenjun date:2013-12-25
+//modify:xueshuangbai
 void
 CodeGeneratorMIPS::postAsmJSCall(LAsmJSCall *lir)
 {
+    ASSERT(0);
     // NOTE:this part is about ASM.JS in firefox,so deleted for temp
     /*
     MAsmJSCall *mir = lir->mir();
@@ -2662,6 +2665,10 @@ CodeGeneratorMIPS::postAsmJSCall(LAsmJSCall *lir)
         masm.loadDouble(op, ReturnFloatReg);
     }
     */
+    return;
+    //no need to move double return value
+    //to ReturnFloatReg=f0,
+    //since it has been in f0,due to ABI
 }
 
 void
