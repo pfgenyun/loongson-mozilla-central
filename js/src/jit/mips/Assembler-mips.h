@@ -1956,37 +1956,7 @@ class Assembler
         movss(src, Operand(dest));
     }
 
-    // New function
-    void movdqa(const Operand &src, const FloatRegister &dest) {
-        JS_ASSERT(0);
-//        JS_ASSERT(HasSSE2());
-//        switch (src.kind()) {
-//          case Operand::MEM_REG_DISP:
-//            masm.movdqa_mr(src.disp(), src.base(), dest.code());
-//            break;
-//          case Operand::MEM_SCALE:
-//            masm.movdqa_mr(src.disp(), src.base(), src.index(), src.scale(), dest.code());
-//            break;
-//          default:
-//            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
-//        }
-    }
-    // New function
-    void movdqa(const FloatRegister &src, const Operand &dest) {
-        JS_ASSERT(0);
-//        JS_ASSERT(HasSSE2());
-//        switch (dest.kind()) {
-//          case Operand::MEM_REG_DISP:
-//            masm.movdqa_rm(src.code(), dest.disp(), dest.base());
-//            break;
-//          case Operand::MEM_SCALE:
-//            masm.movdqa_rm(src.code(), dest.disp(), dest.base(), dest.index(), dest.scale());
-//            break;
-//          default:
-//            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
-//        }
-    }
-     void cvtss2sd(const FloatRegister &src, const FloatRegister &dest) {
+    void cvtss2sd(const FloatRegister &src, const FloatRegister &dest) {
 //ok        masm.cvtss2sd_rr(src.code(), dest.code());
         mcss.convertFloatToDouble(src.code(), dest.code());
     }
@@ -2468,24 +2438,9 @@ class Assembler
     JmpSrc ma_callIonHalfPush(const Register reg);
 
     void breakpoint() {
-    //    masm.int3();
       mcss.breakpoint();
     }
-/*
-    // New function, maybe useless
-    static bool HasSSE2() {
-        JS_ASSERT(0);
-        //return JSC::MacroAssembler::getSSEState() >= JSC::MacroAssembler::HasSSE2;
-    }
-    static bool HasSSE3() {
-        JS_ASSERT(0);
-        //return JSC::MacroAssembler::getSSEState() >= JSC::MacroAssembler::HasSSE3;
-    }
-    static bool HasSSE41() {
-        JS_ASSERT(0);
-        //return JSC::MacroAssembler::getSSEState() >= JSC::MacroAssembler::HasSSE4_1;
-    }
-*/
+
     // The below cmpl methods switch the lhs and rhs when it invokes the
     // macroassembler to conform with intel standard.  When calling this
     // function put the left operand on the left as you would expect.
@@ -2809,6 +2764,7 @@ class Assembler
   //      masm.sarl_CLr(dest.code());
       mcss.rshift32(mRegisterID(v0.code()), dest.code());
     }
+
     // New function
     void xaddl(const Register &srcdest, const Operand &mem) {
         JS_ASSERT(0);
@@ -2825,7 +2781,6 @@ class Assembler
     }
 
     void push(const Imm32 imm) {
-//ok??        masm.push_i32(imm.value);
         mcss.push(mTrustedImm32(imm.value));
     }
 
@@ -2899,17 +2854,7 @@ class Assembler
         pop(cmpTemp2Register);
         pop(cmpTempRegister);
     }
-
-    // New function
-#ifdef JS_CPU_X86
-    void pushAllRegs() {
-        //masm.pusha();
-    }
-    void popAllRegs() {
-        //masm.popa();
-    }
-#endif
-
+    
     // Zero-extend byte to 32-bit integer.
     // New function
     void movzbl(const Register &src, const Register &dest) {
@@ -2923,13 +2868,6 @@ class Assembler
     	mcss.zeroExtend32ToPtr(src.code(),dest.code());//mipsÖÐ²¢Ã»ÓÐÊµÏÖÀ©Õ¹£¡
     }
 
-    // Zero-extend byte to 32-bit integer.
-    //Converts signed DWORD in EAX to a signed quad word in EDX:EAX by
-  //      extending the high order bit of EAX throughout EDX
-    void cdq() {
-      //  masm.cdq();
-        ASSERT(0);
-    }
     void idiv(Register divisor) {
       //  masm.idivl_r(divisor.code());//in x86:idivl  signed
       //   mcss.div(t6.code(), divisor.code());
@@ -2944,50 +2882,7 @@ class Assembler
         mfhi(t7);
         mflo(t6);
     }
-
-    void unpcklps(const FloatRegister &src, const FloatRegister &dest) {
-    	ASSERT(0);
-   //     JS_ASSERT(HasSSE2());
-    //    masm.unpcklps_rr(src.code(), dest.code());
-    }
-    void pinsrd(const Register &src, const FloatRegister &dest) {
-    	ASSERT(0);
-  //      JS_ASSERT(HasSSE2());
-   //     masm.pinsrd_rr(src.code(), dest.code());
-    }
-    // New function
-    void pinsrd(const Operand &src, const FloatRegister &dest) {
-    	JS_ASSERT(0);
-        //JS_ASSERT(HasSSE2());
-        switch (src.kind()) {
-          case Operand::REG:
-            //masm.pinsrd_rr(src.reg(), dest.code());
-            break;
-          case Operand::MEM_REG_DISP:
-            //masm.pinsrd_mr(src.disp(), src.base(), dest.code());
-            break;
-          default:
-            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
-        }
-    }
-    // New function
-    void psrldq(Imm32 shift, const FloatRegister &dest) {
-      ASSERT(0);
-      /*  JS_ASSERT(HasSSE2());
-        masm.psrldq_ir(shift.value, dest.code());*/
-    }
-    // New function
-    void psllq(Imm32 shift, const FloatRegister &dest) {
-    ASSERT(0);
-    /*    JS_ASSERT(HasSSE2());
-        masm.psllq_ir(shift.value, dest.code());*/
-    }
-    void psrlq(Imm32 shift, const FloatRegister &dest) {
-    ASSERT(0);
-   /*     JS_ASSERT(HasSSE2());
-        masm.psrlq_ir(shift.value, dest.code());*/
-    }
-
+    
     void cvtsi2sd(const Operand &src, const FloatRegister &dest) {
         switch (src.kind()) {
           case Operand::REG:
@@ -3051,30 +2946,6 @@ class Assembler
         mcss.convertInt32ToDouble(src.code(), dest.code());
     }
 
-    void movmskpd(const FloatRegister &src, const Register &dest) {
-        JS_ASSERT(0);
-     //   JS_ASSERT(HasSSE2());
-    //    masm.movmskpd_rr(src.code(), dest.code());
-        // fix me: by wangqing
-//        dmfc1(dest, src);
-//        dsrl32(dest, dest, 31);
-    }
-
-    void movmskps(const FloatRegister &src, const Register &dest) {
-        JS_ASSERT(0);
-        //JS_ASSERT(0);
-//        JS_ASSERT(HasSSE2());
-//        masm.movmskps_rr(src.code(), dest.code());
-        // fix me; by wangqing
-//        dmfc1(dest, src);
-    }
-
-   void ptest(const FloatRegister &lhs, const FloatRegister &rhs) {
-  ASSERT(0);
-   /*     JS_ASSERT(HasSSE41());
-        masm.ptest_rr(rhs.code(), lhs.code());*/
-    }
-
     void ucomisd(const FloatRegister &lhs, const FloatRegister &rhs) {
      //   JS_ASSERT(HasSSE2());
    //     masm.ucomisd_rr(rhs.code(), lhs.code());
@@ -3093,11 +2964,6 @@ class Assembler
         mcss.moveFloat(lhs.code(), fpTempRegister.code());
     }
 
-    void pcmpeqw(const FloatRegister &lhs, const FloatRegister &rhs) {
-   ASSERT(0);
-    /*  JS_ASSERT(HasSSE2());
-        masm.pcmpeqw_rr(rhs.code(), lhs.code());*/
-    } 
     void movd(const Register &src, const FloatRegister &dest) {
 //ok        masm.movd_rr(src.code(), dest.code());
         mcss.convertInt32ToDouble(src.code(),dest.code());
@@ -3294,7 +3160,6 @@ class Assembler
     void zeros(const FloatRegister &src);
     void xorpd(const FloatRegister &src, const FloatRegister &dest) {
           //ASSERT(0);
-   //     JS_ASSERT(HasSSE2());
   //      masm.xorpd_rr(src.code(), dest.code());
         ASSERT(src.code() == dest.code());
         zerod(src);
@@ -3307,35 +3172,29 @@ class Assembler
         ASSERT(src.code() == dest.code());
         zerod(src);
     }
+
     void orpd(const FloatRegister &src, const FloatRegister &dest) {
-        ASSERT(0);
-    /*    JS_ASSERT(HasSSE2());
-        masm.orpd_rr(src.code(), dest.code());*/
+        //only used at on place, CodeGenerator-mips.cpp:visitMinMaxD()
+        //by weizhenwei, 2013.11.19
+        mfc1(cmpTempRegister, js::jit::FloatRegister::FromCode(src.code() + 1));
+        mfc1(cmpTemp2Register, js::jit::FloatRegister::FromCode(dest.code() + 1));
+        orl(cmpTempRegister, cmpTemp2Register);
+        mtc1(cmpTemp2Register, js::jit::FloatRegister::FromCode(dest.code() + 1));
     }
-    void andpd(const FloatRegister &src, const FloatRegister &dest) {
-         ASSERT(0);
-  /*      JS_ASSERT(HasSSE2());
-        masm.andpd_rr(src.code(), dest.code());*/
-    }
-    // New function
-    void andps(const FloatRegister &src, const FloatRegister &dest) {
-        JS_ASSERT(0);
-        //JS_ASSERT(HasSSE2());
-        //masm.andps_rr(src.code(), dest.code());
-    }
+
     void sqrtsd(const FloatRegister &src, const FloatRegister &dest) {
        // JS_ASSERT(HasSSE2());
       //  masm.sqrtsd_rr(src.code(), dest.code());
         mcss.sqrtDouble(src.code(), dest.code());
     }
-    // New function
+
     void sqrtss(const FloatRegister &src, const FloatRegister &dest) {
         //JS_ASSERT(0);
     //    JS_ASSERT(HasSSE2());
     //    masm.sqrtss_rr(src.code(), dest.code());
         mcss.sqrtFloat(src.code(), dest.code());
     }
-    // New function
+
     void roundsd(const FloatRegister &src, const FloatRegister &dest)
                  //JSC::X86Assembler::RoundingMode mode)
     {
@@ -3354,50 +3213,6 @@ class Assembler
         mcss.floorFloat(src.code(), dest.code());
     }
     
-    //author:huangwenjun date:2013-12-25
-    //modify:xueshuangbai
-    // New function
-    //void fisttp(const Operand &dest) {
-    //    ASSERT(0);
-        //JS_ASSERT(HasSSE3());
-        //switch (dest.kind()) {
-        //  case Operand::MEM_REG_DISP:
-        //    //masm.fisttp_m(dest.disp(), dest.base());
-        //    break;
-        //  default:
-        //    MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
-        //}
-    //}
-    
-    //author:huangwenjun date:2013-12-25
-    //modify:xueshuangbai
-    // New function
-    // void fld(const Operand &dest) {
-    //     ASSERT(0);
-    //    switch (dest.kind()) {
-    //      case Operand::MEM_REG_DISP:
-            //masm.fld_m(dest.disp(), dest.base());
-    //        push(dest); // by wangqing
-    //        break;
-    //      default:
-    //        MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
-    //    }
-   // }
-    
-    //author:huangwenjun date:2013-12-25
-    //modify by xueshuanbai
-    // New function
-//    void fstp(const Operand &src) {
-//        ASSERT(0);
-//        switch (src.kind()) {
-//          case Operand::MEM_REG_DISP:
-//            //masm.fstp_m(src.disp(), src.base());
-//            break;
-//          default:
-//            MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
-//        }
-//    }
-
     // Defined for compatibility with ARM's assembler
     uint32_t actualOffset(uint32_t x) {
         return x;
@@ -3455,8 +3270,8 @@ class Assembler
         uint32_t *ptr = ((uintptr_t*) data.raw());
         uint32_t luiIns = *ptr;
         uint32_t oriIns = *(ptr+1);
-        JS_ASSERT(luiIns & 0xfc000000 == 0x3c000000); // whether is lui 
-        JS_ASSERT(oriIns & 0xfc000000 == 0x34000000); // whether is ori 
+        JS_ASSERT((luiIns & 0xfc000000) == 0x3c000000); // whether is lui 
+        JS_ASSERT((oriIns & 0xfc000000) == 0x34000000); // whether is ori 
         uint32_t oldData = ((luiIns & 0x0000ffff) << 16) | (oriIns & 0x0000ffff);
         JS_ASSERT(oldData == (uint32_t)expectedData.value);
         *ptr = (luiIns & 0xffff0000) | ((*(int32_t *)(newData.value) & 0xffff0000) >> 16);
@@ -3954,6 +3769,12 @@ class Assembler
     void absd(const FloatRegister &fd, const FloatRegister &fs)               
     {   
         masm.absd(fd.code(), fs.code());                                      
+    }
+
+    // add by wangqing
+    void abss(const FloatRegister &fd, const FloatRegister &fs)               
+    {   
+        masm.abss(fd.code(), fs.code());                                      
     }
 
     void lwc1(const FloatRegister &ft, const Register &rs, ImmWord offset)

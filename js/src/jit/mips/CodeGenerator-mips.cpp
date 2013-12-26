@@ -723,9 +723,9 @@ CodeGeneratorMIPS::visitAbsF(LAbsF *ins)
 {
     FloatRegister input = ToFloatRegister(ins->input());
     JS_ASSERT(input == ToFloatRegister(ins->output()));
-    // Same trick as visitAbsD above.
-    masm.loadConstantFloat32(SpecificFloatNaN(0, FloatSignificandBits), ScratchFloatReg);
-    masm.andps(ScratchFloatReg, input);
+
+    //by weizhenwei, 2013.11.08
+    masm.abss(input, input);
     return true;
 }
 
@@ -1210,7 +1210,6 @@ CodeGeneratorMIPS::visitDivI(LDivI *ins)
     }
 
     // Sign extend eax into edx to make (edx:eax), since idiv is 64-bit.
-    masm.cdq();
     masm.idiv(rhs);
 
     if (!mir->isTruncated()) {
@@ -1415,7 +1414,6 @@ CodeGeneratorMIPS::visitModI(LModI *ins)
         overflow = new(alloc()) ModOverflowCheck(ins, rhs);
         masm.j(Assembler::Equal, overflow->entry());
         masm.bind(overflow->rejoin());
-        masm.cdq();
         masm.idiv(rhs);
 
         if (!ins->mir()->isTruncated()) {

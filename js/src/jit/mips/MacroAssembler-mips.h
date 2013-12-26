@@ -787,7 +787,7 @@ class MacroAssemblerMIPS : public Assembler
         movl(payloadOf(src), dest);
     }
     void unboxDouble(const Address &src, const FloatRegister &dest) {
-        loadDouble(Operand(src), dest);
+        movsd(Operand(src), dest);
     }
     void unboxBoolean(const ValueOperand &src, const Register &dest) {
         movl(src.payloadReg(), dest);
@@ -801,33 +801,15 @@ class MacroAssemblerMIPS : public Assembler
     }
     void unboxDouble(const ValueOperand &src, const FloatRegister &dest) {
         JS_ASSERT(dest != ScratchFloatReg);
-#if 0
-        if (Assembler::HasSSE41()) {
-            movd(src.payloadReg(), dest);
-            pinsrd(src.typeReg(), dest);
-        } else {
-            movd(src.payloadReg(), dest);
-            movd(src.typeReg(), ScratchFloatReg);
-            unpcklps(ScratchFloatReg, dest);
-        }
-#endif
+
         fastLoadDouble(src.payloadReg(), src.typeReg(), dest);
     }
+    //It is different with x86!
+    //xsb:fixme
     void unboxDouble(const Operand &payload, const Operand &type,
                      const Register &scratch, const FloatRegister &dest) {
         JS_ASSERT(dest != ScratchFloatReg);
-        /*if (Assembler::HasSSE41()) {
-            movl(payload, scratch);
-            movd(scratch, dest);
-            movl(type, scratch);
-            pinsrd(scratch, dest);
-        } else */{
-            movl(payload, scratch);
-            movd(scratch, dest);
-            movl(type, scratch);
-            movd(scratch, ScratchFloatReg);
-            unpcklps(ScratchFloatReg, dest);
-        }
+        JS_ASSERT(0);
     }
     void unboxString(const ValueOperand &src, const Register &dest) {
         movl(src.payloadReg(), dest);
