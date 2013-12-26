@@ -242,25 +242,35 @@ JitRuntime::generateInvalidator(JSContext *cx)
     for (uint32_t i = 0; i < FloatRegisters::Total; i += 2)
         masm.movsd(FloatRegister::FromCode(i), Operand(sp, i * sizeof(double)));
 
-    masm.movl(sp, s1); // Argument to ion::InvalidationBailout.
+    masm.movl(sp, t6); // Argument to ion::InvalidationBailout.
 
     // Make space for InvalidationBailout's frameSize outparam.
     masm.reserveStack(sizeof(size_t));
+    masm.movl(sp, s1);
+
+    //hwj
+    // Make space for InvalidationBailout's bailoutInfo outparam.
+    masm.reserveStack(sizeof(void *));
     masm.movl(sp, t8);
 
-    masm.setupUnalignedABICall(2, t7);
+    masm.setupUnalignedABICall(3, t7);
+    masm.passABIArg(t6);
     masm.passABIArg(s1);
     masm.passABIArg(t8);
     masm.callWithABI(JS_FUNC_TO_DATA_PTR(void *, InvalidationBailout));
 
+    masm.pop(t8); // Get bailoutInfo outparam.
     masm.pop(s1); // Get the frameSize outparam.
 
     // Pop the machine state and the dead frame.
     masm.lea(Operand(sp, s1, TimesOne, sizeof(InvalidationBailoutStack)), sp);//caution FloatRegisters::Total
 
     // Jump to shared bailout tail. The BailoutInfo pointer has to be in ecx.
-    IonCode *bailoutTail = cx->runtime()->jitRuntime()->getBailoutTail();
-    masm.jmp(bailoutTail);
+//    IonCode *bailoutTail = cx->runtime()->jitRuntime()->getBailoutTail();
+//    masm.jmp(bailoutTail);
+
+    //hwj: position difference
+    masm.generateBailoutTail(t7,t8);
 
     Linker linker(masm);
     IonCode *code = linker.newCode<NoGC>(cx, JSC::OTHER_CODE);
@@ -277,24 +287,27 @@ IonCode *
 JitRuntime::generateArgumentsRectifier(JSContext *cx, ExecutionMode mode, void **returnAddrOut)
 {
     MacroAssembler masm(cx);
-    //masm.push(ra);
-/*
+
     // ArgumentsRectifierReg contains the |nargs| pushed onto the current frame.
     // Including |this|, there are (|nargs| + 1) arguments to copy.
-    JS_ASSERT(ArgumentsRectifierReg == s0);
+    JS_ASSERT(ArgumentsRectifierReg == s5);//s0
 
     // Load the number of |undefined|s to push into %ecx.
-    masm.movl(Operand(sp, IonRectifierFrameLayout::offsetOfCalleeToken()), t6);
-    masm.movzwl(Operand(t6, offsetof(JSFunction, nargs)), t8);
-    masm.subl(s0, t8);
+    masm.loadPtr(Address(sp, IonRectifierFrameLayout::offsetOfCalleeToken()), t6);
+    masm.movzwl(Operand(t6, JSFunction::offsetOfNargs()), t8);
+    masm.subl(s5, t8);
 
     // Copy the number of actual arguments.
-    masm.movl(Operand(sp, IonRectifierFrameLayout::offsetOfNumActualArgs()), t7);
+    masm.loadPtr(Address(sp, IonRectifierFrameLayout::offsetOfNumActualArgs()), t7);
 
     masm.moveValue(UndefinedValue(), s1, s2);
 
+    // NOTE: The fact that x86 ArgumentsRectifier saves the FramePointer is relied upon
+    // by the baseline bailout code.  If this changes, fix that code!  See
+    // BaselineJIT.cpp/BaselineStackBuilder::calculatePrevFramePtr, and
+    // BaselineJIT.cpp/InitFromBailout. 
     masm.push(FramePointer);
-    masm.movl(sp, FramePointer); // Save %esp.
+    masm.movl(sp, FramePointer); 
 
     // Push undefined.
     {
@@ -311,7 +324,7 @@ JitRuntime::generateArgumentsRectifier(JSContext *cx, ExecutionMode mode, void *
 
     // Get the topmost argument. We did a push of %ebp earlier, so be sure to
     // account for this in the offset
-    BaseIndex b = BaseIndex(FramePointer, s0, TimesEight,//TBD BaseIndex special treat
+    BaseIndex b = BaseIndex(FramePointer, s5, TimesEight,
                             sizeof(IonRectifierFrameLayout) + sizeof(void*));
     masm.lea(Operand(b), t8);
 
@@ -323,13 +336,13 @@ JitRuntime::generateArgumentsRectifier(JSContext *cx, ExecutionMode mode, void *
 
         masm.bind(&copyLoopTop);
         masm.subl(Imm32(sizeof(Value)), t8);
-        masm.subl(Imm32(1), s0);
+        masm.subl(Imm32(1), s5);
         masm.bind(&initialSkip);
 
         masm.push(Operand(t8, sizeof(Value)/2));
         masm.push(Operand(t8, 0x0));
 
-        masm.testl(s0, s0);
+        masm.testl(s5, s5);
         masm.j(Assembler::NonZero, &copyLoopTop);
     }
 
@@ -345,14 +358,10 @@ JitRuntime::generateArgumentsRectifier(JSContext *cx, ExecutionMode mode, void *
 
     // Call the target function.
     // Note that this assumes the function is JITted.
-//NOTE: in ff24,this is not logical,so deleted for temp    
- //masm.movl(Operand(t6, offsetof(JSFunction, u.i.script_)), t6);
-    masm.movl(Operand(t6, offsetof(JSScript, ion)), t6);
-    masm.movl(Operand(t6, IonScript::offsetOfMethod()), t6);
-    masm.movl(Operand(t6, IonCode::offsetOfCode()), t6);
-//ok    //arm : masm.ma_callIonHalfPush
-//ok    masm.call(t6);
-    masm.ma_callIonHalfPush(t6);
+    masm.loadPtr(Address(t6, JSFunction::offsetOfNativeOrScript()), t6);
+    masm.loadBaselineOrIonRaw(t6, t6, mode, NULL);
+    masm.call(t6);
+    uint32_t returnOffset = masm.currentOffset();
 
     // Remove the rectifier frame.
     masm.pop(s1);            // ebx <- descriptor with FrameType.
@@ -366,7 +375,7 @@ JitRuntime::generateArgumentsRectifier(JSContext *cx, ExecutionMode mode, void *
 
     masm.pop(FramePointer);
     masm.ret();
-*/
+
     Linker linker(masm);
     IonCode *code = linker.newCode<NoGC>(cx, JSC::OTHER_CODE);
 
@@ -374,6 +383,10 @@ JitRuntime::generateArgumentsRectifier(JSContext *cx, ExecutionMode mode, void *
     writePerfSpewerIonCodeProfile(code, "ArgumentsRectifier");
 #endif
 
+    CodeOffsetLabel returnLabel(returnOffset);
+    returnLabel.fixup(&masm);
+    if (returnAddrOut)
+        *returnAddrOut = (void *) (code->raw() + returnLabel.offset());
     return code;
 }
 

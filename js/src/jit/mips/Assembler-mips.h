@@ -2519,24 +2519,26 @@ class Assembler
         JS_ASSERT(GeneralRegisterSet(Registers::SingleByteRegs).has(rhs));//?
         movl(lhs,cmpTempRegister);
         movl(rhs,cmpTemp2Register);
+        andl(cmpTemp2Register, cmpTempRegister);
+        movl(zero, cmpTemp2Register);
     }
     void testl(const Register &lhs, const Register &rhs) {
         movl(lhs,cmpTempRegister);
         movl(rhs,cmpTemp2Register);
-        andl(cmpTempRegister,cmpTemp2Register);
-        movl(zero,cmpTempRegister);
+        andl(cmpTemp2Register,cmpTempRegister);
+        movl(zero,cmpTemp2Register);
     }
     void testl(const Register &lhs, Imm32 rhs) {
         movl(lhs,cmpTempRegister);
         movl(rhs,cmpTemp2Register);
-        andl(cmpTempRegister,cmpTemp2Register);
-        movl(zero,cmpTempRegister);
+        andl(cmpTemp2Register,cmpTempRegister);
+        movl(zero,cmpTemp2Register);
     }
    void testl(const Operand &lhs, Imm32 rhs) {
         movl(lhs,cmpTempRegister);
         movl(rhs,cmpTemp2Register);
-        andl(cmpTempRegister,cmpTemp2Register);
-        movl(zero,cmpTempRegister);
+        andl(cmpTemp2Register,cmpTempRegister);
+        movl(zero,cmpTemp2Register);
     }
 
     void addl(Imm32 imm, const Register &dest) {
@@ -3074,6 +3076,7 @@ class Assembler
     void ucomisd(const FloatRegister &lhs, const FloatRegister &rhs) {
      //   JS_ASSERT(HasSSE2());
    //     masm.ucomisd_rr(rhs.code(), lhs.code());
+        ASSERT(0);
         mcss.moveDouble(lhs.code(), fpTempRegister.code());
         mcss.moveDouble(rhs.code(), fpTemp2Register.code());
     }
@@ -3083,6 +3086,7 @@ class Assembler
         //JS_ASSERT(0);
 //        JS_ASSERT(HasSSE2());
 //        masm.ucomiss_rr(rhs.code(), lhs.code());
+        ASSERT(0);
         mcss.moveFloat(lhs.code(), fpTempRegister.code());
         mcss.moveFloat(lhs.code(), fpTempRegister.code());
     }

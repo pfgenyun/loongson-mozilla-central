@@ -1012,7 +1012,8 @@ class MacroAssemblerMIPS : public Assembler
     void inc64(AbsoluteAddress dest) {
         addl(Imm32(1), Operand(dest));
         Label noOverflow;
-        cmpl(zero,Operand(dest));
+        // add by QuQiuwen
+        cmpl(Operand(dest), zero);
         j(NonZero, &noOverflow);
         addl(Imm32(1), Operand(dest.offset(4)));
         bind(&noOverflow);
@@ -1400,8 +1401,9 @@ class MacroAssemblerMIPS : public Assembler
         cvtsi2ss(src, dest);
     }
     Condition testDoubleTruthy(bool truthy, const FloatRegister &reg) {
-        zeroDouble(ScratchFloatReg);
-        ucomisd(ScratchFloatReg, reg);
+        //zeroDouble(ScratchFloatReg);
+        //ucomisd(ScratchFloatReg, reg);
+        zerod(ScratchFloatReg);
         return truthy ? NonZero : Zero;
     }
     void load8ZeroExtend(const Address &src, const Register &dest) {
@@ -1591,9 +1593,11 @@ class MacroAssemblerMIPS : public Assembler
     {
         cvttsd2si(src, dest);
         cvtsi2sd(dest, ScratchFloatReg);
-        ucomisd(src, ScratchFloatReg);
-        j(Assembler::Parity, fail);
-        j(Assembler::NotEqual, fail);
+//        ucomisd(src, ScratchFloatReg);
+//        j(Assembler::Parity, fail);
+//        j(Assembler::NotEqual, fail);
+        branchDouble(DoubleConditionFromCondition(Assembler::Parity), src, ScratchFloatReg, fail);
+        branchDouble(DoubleConditionFromCondition(Assembler::NotEqual), src, ScratchFloatReg, fail);
 
         // Check for -0
         if (negativeZeroCheck) {
@@ -1601,17 +1605,12 @@ class MacroAssemblerMIPS : public Assembler
             testl(dest, dest);
             j(Assembler::NonZero, &notZero);
 
-//            if (Assembler::HasSSE41()) {
-//                ptest(src, src);
-//                j(Assembler::NonZero, fail);
-//            } else {
-                // bit 0 = sign of low double
-                // bit 1 = sign of high double
-                movmskpd(src, dest);
-                andl(Imm32(1), dest);
-                cmpl(zero,dest);
-                j(Assembler::NonZero, fail);
-//            }
+            // bit 0 = sign of low double
+            // bit 1 = sign of high double
+            movmskpd(src, dest);
+            andl(Imm32(1), dest);
+            cmpl(dest,zero);
+            j(Assembler::NonZero, fail);
 
             bind(&notZero);
         }
@@ -1703,11 +1702,9 @@ class MacroAssemblerMIPS : public Assembler
             // If the register we're defining is a single byte register,
             // take advantage of the setCC instruction
             setCC(cond, dest);
-//            movzbl(dest, dest);
 
             if (ifNaN != Assembler::NaN_HandledByCond) {
                 Label noNaN;
- //               j(Assembler::NoParity, &noNaN);
                 mov(ImmWord(ifNaN == Assembler::NaN_IsTrue), dest);
                 bind(&noNaN);
             }
@@ -1717,7 +1714,6 @@ class MacroAssemblerMIPS : public Assembler
 
             if (ifNaN == Assembler::NaN_IsFalse)
                 ASSERT(0);
-  //              j(Assembler::Parity, &ifFalse);
             // Note a subtlety here: FLAGS is live at this point, and the
             // mov interface doesn't guarantee to preserve FLAGS. Use
             // movl instead of mov, because the movl instruction
@@ -1726,7 +1722,6 @@ class MacroAssemblerMIPS : public Assembler
             j(cond, &end);
             if (ifNaN == Assembler::NaN_IsTrue)
                 ASSERT(0);
-//                j(Assembler::Parity, &end);
             bind(&ifFalse);
             mov(ImmWord(0), dest);
 
