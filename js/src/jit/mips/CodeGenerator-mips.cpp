@@ -129,7 +129,11 @@ CodeGeneratorMIPS::emitBranch(Assembler::DoubleCondition cond,
     } else if (ifNaN == Assembler::NaN_IsTrue) {
         //jumpToBlock(mirTrue, Assembler::Parity);
         jumpToBlockDouble(mirTrue, lhs, rhs, Assembler::DoubleUnordered);
+    } else {
+        //check NaN
+        jumpToBlockDouble(mirFalse, lhs, rhs, Assembler::DoubleUnordered);
     }
+
 
     if (isNextBlock(mirFalse->lir())) {
         //jumpToBlock(mirTrue, cond);
@@ -933,18 +937,12 @@ CodeGeneratorMIPS::visitMulI(LMulI *ins)
         }
 
         switch (constant) {
-          case -1:
-            masm.negl(ToOperand(lhs));
-            break;
           case 0:
             masm.xorl(ToOperand(lhs), ToRegister(lhs));
             return true; // escape overflow check;
           case 1:
             // nop
             return true; // escape overflow check;
-          case 2:
-            masm.addl(ToOperand(lhs), ToRegister(lhs));
-            break;
           default:
             if (!mul->canOverflow() && constant > 0) {
                 // Use shift if cannot overflow and constant is power of 2
@@ -955,16 +953,34 @@ CodeGeneratorMIPS::visitMulI(LMulI *ins)
                 }
             }
             masm.imull(Imm32(ToInt32(rhs)), ToRegister(lhs));
+
+            //overflow check, by weizhenwei, 2013.11.14
+            masm.mfhi(cmpTempRegister);
+            masm.mflo(cmpTemp2Register);
+            masm.sarl(Imm32(0x1f), cmpTemp2Register);
+
+            // Bailout on overflow
+            //if (mul->canOverflow() && !bailoutIf(Assembler::Overflow, ins->snapshot()))
+            //see See MIPS Run Linux Chinese 2rd, Page 139. overflow check logic
+            if (mul->canOverflow() && !bailoutIf(Assembler::NotEqual, ins->snapshot()))
+                return false;
         }
 
-        // Bailout on overflow
-        if (mul->canOverflow() && !bailoutIf(Assembler::Overflow, ins->snapshot()))
-            return false;
+//        // Bailout on overflow
+//        if (mul->canOverflow() && !bailoutIf(Assembler::Overflow, ins->snapshot()))
+//            return false;
     } else {
         masm.imull(ToOperand(rhs), ToRegister(lhs));
 
+        //overflow check, by weizhenwei, 2013.11.14
+        masm.mfhi(cmpTempRegister);
+        masm.mflo(cmpTemp2Register);
+        masm.sarl(Imm32(0x1f), cmpTemp2Register);
+
         // Bailout on overflow
-        if (mul->canOverflow() && !bailoutIf(Assembler::Overflow, ins->snapshot()))
+        //if (mul->canOverflow() && !bailoutIf(Assembler::Overflow, ins->snapshot()))
+        //see See MIPS Run Linux Chinese 2rd, Page 139. overflow check logic
+        if (mul->canOverflow() && !bailoutIf(Assembler::NotEqual, ins->snapshot()))
             return false;
 
         if (mul->canBeNegativeZero()) {
