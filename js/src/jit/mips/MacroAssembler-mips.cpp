@@ -45,8 +45,6 @@ MacroAssemblerMIPS::getDouble(double d)
 void
 MacroAssemblerMIPS::loadConstantDouble(double d, const FloatRegister &dest)
 {
-    if (maybeInlineDouble(d, dest))
-        return;
     Double *dbl = getDouble(d);
     if (!dbl)
         return;
@@ -65,9 +63,12 @@ MacroAssemblerMIPS::addConstantDouble(double d, const FloatRegister &dest)
     Double *dbl = getDouble(d);
     if (!dbl)
         return;
-//    masm.addsd_mr(reinterpret_cast<const void *>(dbl->uses.prev()), dest.code());  // need to modify . by wangqing
-    mcss.loadDouble(reinterpret_cast<const void *>(dbl->uses.prev()), dest.code()); 
-    dbl->uses.setPrev(masm.size());
+//    masm.addsd_mr(reinterpret_cast<const void *>(dbl->uses.prev()), dest.code()); 
+    mcss.addDouble(reinterpret_cast<const void *>(dbl->uses.prev()), dest.code()); 
+    //author:huangwenjun date:2013-12-23
+    //dbl->uses.setPrev(masm.size());
+    mov(&(dbl->uses), addrTempRegister);
+    ldc1(dest,addrTempRegister,ImmWord((uintptr_t)((void*)0)));
 }
 
 MacroAssemblerMIPS::Float *
@@ -390,27 +391,12 @@ MacroAssemblerMIPS::callWithABIPre(uint32_t *stackAdjust)
 void
 MacroAssemblerMIPS::callWithABIPost(uint32_t stackAdjust, Result result)
 {
- /*   freeStack(stackAdjust);
-    if (result == DOUBLE) {
-        reserveStack(sizeof(double));
-        fstp(Operand(esp, 0));
-        movsd(Operand(esp, 0), ReturnFloatReg);
-        freeStack(sizeof(double));
-    }
-    if (dynamicAlignment_)
-        pop(esp);
-
-    JS_ASSERT(inCall_);
-    inCall_ = false;*/
     freeStack(stackAdjust);
     if (result == DOUBLE) {
     //xsb:the result has been in f0,due to O32 ABI
     //and we set ReturnFloatReg=f0
     //so we don't need to move result from f0 to ReturnFloatReg
     }
-    if (result == FLOAT) {
-    }
-
     if (dynamicAlignment_)
         pop(sp);
 
@@ -540,6 +526,7 @@ MacroAssemblerMIPS::handleFailureWithHandler(void *handler)
 void
 MacroAssemblerMIPS::handleFailureWithHandlerTail()
 {
+    JS_ASSERT(0);
 /*
     Label entryFrame;
     Label catch_;

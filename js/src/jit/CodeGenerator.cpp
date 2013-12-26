@@ -558,7 +558,7 @@ CodeGenerator::testValueTruthyKernel(const ValueOperand &value,
     cond = masm.testDoubleTruthy(false, fr);
     //parameter false means cond == Zero,
     //so branchDouble(Assembler::DoubleEqual directly.
-    //by weizhenwei, 2013.11.08
+    //by weizhenwei, 2013.12.26
 #if defined(JS_CPU_MIPS)
     //by weizhenwei, 2013.11.18, add check about NaN.
     masm.branchDouble(Assembler::DoubleUnordered, 
@@ -569,8 +569,6 @@ CodeGenerator::testValueTruthyKernel(const ValueOperand &value,
 #else
     masm.j(cond, ifFalsy);
 #endif
-
-    // Fall through for truthy.
 }
 
 void

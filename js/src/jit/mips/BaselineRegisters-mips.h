@@ -22,12 +22,13 @@ static MOZ_CONSTEXPR_VAR Register BaselineStackReg = sp;
 // ValueOperands R0, R1, and R2
 static MOZ_CONSTEXPR_VAR ValueOperand R0(t7, t8);
 static MOZ_CONSTEXPR_VAR ValueOperand R1(s1, s0);
-static MOZ_CONSTEXPR_VAR ValueOperand R2(s3, s4);
+//static MOZ_CONSTEXPR_VAR ValueOperand R2(s3, s4);
+static MOZ_CONSTEXPR_VAR ValueOperand R2(v1, v0);
 
 // BaselineTailCallReg and BaselineStubReg reuse
 // registers from R2.
-static MOZ_CONSTEXPR_VAR Register BaselineTailCallReg = s3;
-static MOZ_CONSTEXPR_VAR Register BaselineStubReg     = s4;
+static MOZ_CONSTEXPR_VAR Register BaselineTailCallReg = v1;
+static MOZ_CONSTEXPR_VAR Register BaselineStubReg     = v0;
 
 static MOZ_CONSTEXPR_VAR Register ExtractTemp0        = InvalidReg;
 static MOZ_CONSTEXPR_VAR Register ExtractTemp1        = InvalidReg;

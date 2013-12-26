@@ -2903,10 +2903,10 @@ ICBinaryArith_BooleanWithInt32::Compiler::generateStubCode(MacroAssembler &masm)
       case JSOP_ADD: {
         Label fixOverflow;
         // edit by QuQiuwen
-    #ifdef defined(JS_CPU_MIPS)
+#ifdef defined(JS_CPU_MIPS)
         cmpl(rhsReg,lhsReg);
         negl(cmpTemp2Register);
-    #endif
+#endif
         masm.add32(rhsReg, lhsReg);
         masm.j(Assembler::Overflow, &fixOverflow);
         masm.tagValue(JSVAL_TYPE_INT32, lhsReg, R0);
@@ -2923,7 +2923,6 @@ ICBinaryArith_BooleanWithInt32::Compiler::generateStubCode(MacroAssembler &masm)
         // edit by QuQiuwen
 #ifdef defined(JS_CPU_MIPS)
         cmpl(rhsReg,lhsReg);
-        negl(cmpTemp2Register);
 #endif
         masm.sub32(rhsReg, lhsReg);
         masm.j(Assembler::Overflow, &fixOverflow);

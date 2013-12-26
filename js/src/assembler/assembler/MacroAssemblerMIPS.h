@@ -3005,7 +3005,7 @@ public:
             return branchFalse();
         }
         if (cond == DoubleEqual) {
-            m_assembler.ceqd(left, right);
+            m_assembler.cseqd(left, right);
             return branchTrue();
         }
         if (cond == DoubleNotEqual) {
@@ -3033,7 +3033,7 @@ public:
             return branchTrue();
         }
         if (cond == DoubleNotEqualOrUnordered) {
-            m_assembler.ceqd(left, right);
+            m_assembler.cseqd(left, right);
             return branchFalse(); // false
         }
         if (cond == DoubleGreaterThanOrUnordered) {

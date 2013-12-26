@@ -218,8 +218,14 @@ CodeGeneratorMIPS::visitTestIAndBranch(LTestIAndBranch *test)
     const LAllocation *opd = test->input();
 
     // Test the operand
-    masm.testl(ToRegister(opd), ToRegister(opd));
-    emitBranch(Assembler::NonZero, test->ifTrue(), test->ifFalse());
+//    masm.testl(ToRegister(opd), ToRegister(opd));
+//    emitBranch(Assembler::NonZero, test->ifTrue(), test->ifFalse());
+    //by weizhenwei, 2013.11.05
+    //masm.xorpd(ScratchFloatReg, ScratchFloatReg);
+    masm.zerod(ScratchFloatReg);
+    emitBranch(masm.DoubleConditionFromCondition(Assembler::NotEqual), 
+               ToFloatRegister(opd), ScratchFloatReg,  test->ifTrue(), test->ifFalse());
+
     return true;
 }
 
@@ -799,12 +805,6 @@ class OutOfLineUndoALUOperation : public OutOfLineCodeBase<CodeGeneratorMIPS>
 bool
 CodeGeneratorMIPS::visitAddI(LAddI *ins)
 {
-/*
-    if (ins->rhs()->isConstant())
-        masm.addl(Imm32(ToInt32(ins->rhs())), ToOperand(ins->lhs()));
-    else
-        masm.addl(ToOperand(ins->rhs()), ToRegister(ins->lhs()));
-*/
     //edit by QuQiuwen
     if (ins->rhs()->isConstant()){
         masm.cmpl(ToOperand(ins->lhs()), Imm32(ToInt32(ins->rhs())));
@@ -816,7 +816,6 @@ CodeGeneratorMIPS::visitAddI(LAddI *ins)
         masm.negl(cmpTemp2Register);
         masm.addl(ToOperand(ins->rhs()), ToRegister(ins->lhs()));
     }
-    //end by QuQiuwen
 
     if (ins->snapshot()) {
         if (ins->recoversInput()) {
@@ -836,12 +835,6 @@ CodeGeneratorMIPS::visitAddI(LAddI *ins)
 bool
 CodeGeneratorMIPS::visitSubI(LSubI *ins)
 {
-/*
-    if (ins->rhs()->isConstant())
-        masm.subl(Imm32(ToInt32(ins->rhs())), ToOperand(ins->lhs()));
-    else
-        masm.subl(ToOperand(ins->rhs()), ToRegister(ins->lhs()));
-*/
    //edit by QuQiuwen,
    if (ins->rhs()->isConstant()){
         masm.cmpl(ToOperand(ins->lhs()),Imm32(ToInt32(ins->rhs())));
@@ -851,7 +844,6 @@ CodeGeneratorMIPS::visitSubI(LSubI *ins)
         masm.cmpl(ToRegister(ins->lhs()),ToOperand(ins->rhs()));
         masm.subl(ToOperand(ins->rhs()), ToRegister(ins->lhs()));
     }
-    //end by QuQiuwen
 
     if (ins->snapshot()) {
         if (ins->recoversInput()) {
@@ -2836,44 +2828,20 @@ CodeGeneratorMIPS::visitOutOfLineTruncate(OutOfLineTruncate *ool)
     Register output = ToRegister(ins->output());
 
     Label fail;
-
-    /*if (Assembler::HasSSE3()) {
-        // Push double.
-        masm.subl(Imm32(sizeof(double)), esp);
-        masm.storeDouble(input, Operand(esp, 0));
-
-        static const uint32_t EXPONENT_MASK = 0x7ff00000;
-        static const uint32_t EXPONENT_SHIFT = DoubleExponentShift - 32;
-        static const uint32_t TOO_BIG_EXPONENT = (DoubleExponentBias + 63) << EXPONENT_SHIFT;
-
-        // Check exponent to avoid fp exceptions.
-        Label failPopDouble;
-        masm.load32(Address(esp, 4), output);
-        masm.and32(Imm32(EXPONENT_MASK), output);
-        masm.branch32(Assembler::GreaterThanOrEqual, output, Imm32(TOO_BIG_EXPONENT), &failPopDouble);
-
-        // Load double, perform 64-bit truncation.
-        masm.fld(Operand(esp, 0));
-        masm.fisttp(Operand(esp, 0));
-
-        // Load low word, pop double and jump back.
-        masm.load32(Address(esp, 0), output);
-        masm.addl(Imm32(sizeof(double)), esp);
-        masm.jump(ool->rejoin());
-
-        masm.bind(&failPopDouble);
-        masm.addl(Imm32(sizeof(double)), esp);
-        masm.jump(&fail);
-    } else*/ {
+    {
         FloatRegister temp = ToFloatRegister(ins->tempFloat());
 
         // Try to convert doubles representing integers within 2^32 of a signed
         // integer, by adding/subtracting 2^32 and then trying to convert to int32.
         // This has to be an exact conversion, as otherwise the truncation works
         // incorrectly on the modified value.
-        masm.xorpd(ScratchFloatReg, ScratchFloatReg);
-        masm.ucomisd(input, ScratchFloatReg);
-        masm.j(Assembler::Parity, &fail);
+        //masm.xorpd(ScratchFloatReg, ScratchFloatReg);
+        //masm.ucomisd(input, ScratchFloatReg);
+        //masm.j(Assembler::Parity, &fail);
+        //by weizhenwei, 2013.11.05
+        masm.zerod(ScratchFloatReg);
+        masm.branchDouble(masm.DoubleConditionFromCondition(Assembler::Parity),
+                                         input, ScratchFloatReg, &fail);
 
         {
             Label positive;
@@ -2892,9 +2860,14 @@ CodeGeneratorMIPS::visitOutOfLineTruncate(OutOfLineTruncate *ool)
         masm.cvttsd2si(temp, output);
         masm.cvtsi2sd(output, ScratchFloatReg);
 
-        masm.ucomisd(temp, ScratchFloatReg);
-        masm.j(Assembler::Parity, &fail);
-        masm.j(Assembler::Equal, ool->rejoin());
+        //masm.ucomisd(temp, ScratchFloatReg);
+        //masm.j(Assembler::Parity, &fail);
+        //masm.j(Assembler::Equal, ool->rejoin());
+        //by weizhenwei, 2013.11.05
+        masm.branchDouble(masm.DoubleConditionFromCondition(Assembler::Parity),
+                                               temp, ScratchFloatReg, &fail);
+        masm.branchDouble(masm.DoubleConditionFromCondition(Assembler::Equal),
+                                               temp, ScratchFloatReg, ool->rejoin());
     }
 
     masm.bind(&fail);
