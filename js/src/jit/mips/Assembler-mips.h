@@ -1361,7 +1361,7 @@ class Assembler
          ori(addrTempRegister, addrTempRegister, src.offset & 0x0000ffff);
          addu(addrTempRegister, addrTempRegister, src.base);
          lwc1(dest, addrTempRegister, 0);
-         cvtds(dest, dest);
+         //cvtds(dest, dest); //xueshuangbai
          return label;
     }
 
@@ -1874,7 +1874,7 @@ class Assembler
          lui(addrTempRegister, (int)src.addr >> 16);
          ori(addrTempRegister, addrTempRegister, (int)src.addr & 0x0000ffff);
          lwc1(dest, addrTempRegister, 0);
-         cvtds(dest, dest);
+         //cvtds(dest, dest); //xueshuangbai
          return label;
 
     }
