@@ -252,6 +252,8 @@ MoveEmitterMIPS::emitGeneralMove(const MoveOperand &from, const MoveOperand &to)
 {
     if (from.isGeneralReg()) {
         masm.mov(from.reg(), toOperand(to));
+    } else if (from.isFloatReg() && to.isGeneralReg()) {
+        masm.mfc1(to.reg(), from.floatReg());
     } else if (to.isGeneralReg()) {
         JS_ASSERT(from.isMemory() || from.isEffectiveAddress());
         if (from.isMemory())

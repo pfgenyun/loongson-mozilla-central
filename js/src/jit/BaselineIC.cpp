@@ -2348,11 +2348,29 @@ ICToBool_NullUndefined::Compiler::generateStubCode(MacroAssembler &masm)
 bool
 ICToBool_Double::Compiler::generateStubCode(MacroAssembler &masm)
 {
-    Label failure, ifTrue;
+    Label failure, ifTrue, isNaN;
     masm.branchTestDouble(Assembler::NotEqual, R0, &failure);
     masm.unboxDouble(R0, FloatReg0);
     Assembler::Condition cond = masm.testDoubleTruthy(true, FloatReg0);
+
+#if defined(JS_CPU_MIPS)
+    //by weizhenwei, 2013.11.13, NaN to Bool
+    masm.zerod(ScratchFloatReg);
+    masm.branchDouble(Assembler::DoubleUnordered, FloatReg0, ScratchFloatReg, &isNaN);
+
+    if (cond == Assembler::NonZero) {
+	masm.branchDouble(Assembler::DoubleNotEqual,
+		ScratchFloatReg, FloatReg0, &ifTrue);
+    } else if (cond == Assembler::Zero) {
+	masm.branchDouble(Assembler::DoubleEqual,
+		ScratchFloatReg, FloatReg0, &ifTrue);
+    }
+
+    //by weizhenwei, 2013.11.13, NaN to Bool
+    masm.bind(&isNaN);
+#else
     masm.j(cond, &ifTrue);
+#endif
 
     masm.moveValue(BooleanValue(false), R0);
     EmitReturnFromIC(masm);

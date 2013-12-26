@@ -3050,19 +3050,21 @@ class Assembler
     }
 
     void movmskpd(const FloatRegister &src, const Register &dest) {
+        JS_ASSERT(0);
      //   JS_ASSERT(HasSSE2());
     //    masm.movmskpd_rr(src.code(), dest.code());
         // fix me: by wangqing
-        dmfc1(dest, src);
-        dsrl32(dest, dest, 31);
+//        dmfc1(dest, src);
+//        dsrl32(dest, dest, 31);
     }
 
     void movmskps(const FloatRegister &src, const Register &dest) {
+        JS_ASSERT(0);
         //JS_ASSERT(0);
 //        JS_ASSERT(HasSSE2());
 //        masm.movmskps_rr(src.code(), dest.code());
         // fix me; by wangqing
-        dmfc1(dest, src);
+//        dmfc1(dest, src);
     }
 
    void ptest(const FloatRegister &lhs, const FloatRegister &rhs) {

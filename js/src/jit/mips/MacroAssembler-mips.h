@@ -29,6 +29,8 @@ class MacroAssemblerMIPS : public Assembler
     bool inCall_;
     uint32_t args_;
     uint32_t passedArgs_;
+    uint32_t passedArgsfake_;
+    uint32_t passedArgsBits_[4];//bitmap, 1 is double, 2 is int
     uint32_t stackForCall_;
     bool dynamicAlignment_;
     bool enoughMemory_;
@@ -1607,9 +1609,13 @@ class MacroAssemblerMIPS : public Assembler
 //            } else {
                 // bit 0 = sign of low double
                 // bit 1 = sign of high double
-                movmskpd(src, dest);
-                andl(Imm32(1), dest);
-                cmpl(zero,dest);
+                //movmskpd(src, dest);
+                //andl(Imm32(1), dest);
+                // move double's high 32 to dest and get its sign bit
+                mfc1(dest, js::jit::FloatRegister::FromCode(src.code() + 1));
+                shrl(Imm32(0x1f), dest);
+
+                cmpl(zero, dest);
                 j(Assembler::NonZero, fail);
 //            }
 
@@ -1640,8 +1646,14 @@ class MacroAssemblerMIPS : public Assembler
 //            } else {
                 // bit 0 = sign of low float
                 // bits 1 to 3 = signs of higher floats
-                movmskps(src, dest);
-                andl(Imm32(1), dest);
+                //movmskps(src, dest);
+                //andl(Imm32(1), dest);
+                // move double's high 32 to dest and get its sign bit
+                // TODO: check whether float and double are same, weizhenwei, 2013.12.26
+                mfc1(dest, js::jit::FloatRegister::FromCode(src.code() + 1));
+                shrl(Imm32(0x1f), dest);
+
+                cmpl(zero, dest);
                 j(Assembler::NonZero, fail);
 //            }
 

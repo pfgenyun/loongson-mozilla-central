@@ -149,6 +149,13 @@ MacroAssemblerMIPS::setupABICall(uint32_t args)
 
     args_ = args;
     passedArgs_ = 0;
+
+    passedArgsfake_ = 0;
+    passedArgsBits_[0] = 0;
+    passedArgsBits_[1] = 0;
+    passedArgsBits_[2] = 0;
+    passedArgsBits_[3] = 0;
+
     stackForCall_ = 16; // fix me: by Quqiuwen
 }
 
@@ -170,27 +177,151 @@ MacroAssemblerMIPS::setupUnalignedABICall(uint32_t args, const Register &scratch
     push(scratch);
 }
 
-void
-MacroAssemblerMIPS::passABIArg(const MoveOperand &from)
+// New version of passABIArg, by weizhenwei, 2013.12.26
+void MacroAssemblerMIPS::passABIArg(const MoveOperand &from)
 {
     MoveOperand to;
 
-    ++passedArgs_;
+    ++passedArgs_; 
+    ++passedArgsfake_;
 
-    if (passedArgs_ <= 4) {
+    if(passedArgsfake_ <= 4) {
         Register destReg;
         FloatRegister destFloatReg;
-    
-        if (from.isDouble() && GetArgFloatReg(passedArgs_, &destFloatReg)) {
-            to = MoveOperand(destFloatReg);
-            enoughMemory_ &= moveResolver_.addMove(from, to, MoveOp::DOUBLE);
-        }else {
-            GetArgReg(passedArgs_, &destReg); 
-            to = MoveOperand(destReg);
-            enoughMemory_ &= moveResolver_.addMove(from, to, MoveOp::GENERAL);
+
+        switch (passedArgs_) {
+            case 1:
+                if (from.isDouble() ) {//first is Double, store in f12
+                    passedArgsBits_[0] = 1;
+                    if (GetArgFloatReg(passedArgsfake_, &destFloatReg)) {
+                        to = MoveOperand(destFloatReg);
+                        enoughMemory_ &= moveResolver_.addMove(from, to, MoveOp::DOUBLE);
+                    }
+                    passedArgsfake_++; //for align problem.
+                } else { //first is int, store in $4.
+                    passedArgsBits_[0] = 2;
+                    GetArgReg(passedArgsfake_, &destReg); 
+                    to = MoveOperand(destReg);
+                    enoughMemory_ &= moveResolver_.addMove(from, to, MoveOp::GENERAL);
+                }
+                break;
+            case 2:
+                if (from.isDouble()) { //second is double;
+                    passedArgsfake_++; //for align problem.
+                    passedArgsBits_[1] = 1;
+                    if (passedArgsBits_[0] == 1) { //first is double, second double store f14;
+                        if (GetArgFloatReg(passedArgsfake_, &destFloatReg)) {
+                            to = MoveOperand(destFloatReg);
+                            enoughMemory_ &= moveResolver_.addMove(from, to, MoveOp::DOUBLE);
+                        }
+                    } else if (passedArgsBits_[0] == 2) { //first is int, second double store ($6, $7)
+                        //TODO
+                        JS_ASSERT(from.isFloatReg());
+                        FloatRegister temp1 = from.floatReg();
+                        FloatRegister temp2 = js::jit::FloatRegister::FromCode(temp1.code() + 1);
+                        MoveOperand from1 = MoveOperand(temp1);
+                        MoveOperand from2 = MoveOperand(temp2);
+
+                        GetArgReg(passedArgsfake_, &destReg); 
+                        to = MoveOperand(destReg);
+                        enoughMemory_ &= moveResolver_.addMove(from1, to, MoveOp::GENERAL);
+
+                        passedArgsfake_++; //for align reason.
+                        GetArgReg(passedArgsfake_, &destReg); 
+                        to = MoveOperand(destReg);
+                        enoughMemory_ &= moveResolver_.addMove(from2, to, MoveOp::GENERAL);
+                    } else { //impossible here
+                        JS_ASSERT(0);
+                    }
+                } else { // second is int, store in $5 or $6, passedArgsfake_ indicates.
+                    passedArgsBits_[1] = 2;
+                    GetArgReg(passedArgsfake_, &destReg); 
+                    to = MoveOperand(destReg);
+                    enoughMemory_ &= moveResolver_.addMove(from, to, MoveOp::GENERAL);
+                }
+                break;
+            case 3:
+                if (from.isDouble()) { //third is double;
+                    passedArgsBits_[2] = 1;
+                    passedArgsfake_++; //for align reason
+                    if ( passedArgsBits_[0] == 1) { //first is double, third double must in stack for align reason.
+                        //third is stack
+                        to = MoveOperand(StackPointer, stackForCall_);
+                        stackForCall_ += sizeof(double);
+                        enoughMemory_ &= moveResolver_.addMove(from, to, MoveOp::DOUBLE);
+                    } else if ( passedArgsBits_[0] == 2) { //first is int, 
+                        if ( passedArgsBits_[1] == 1) { //second is double, 
+                            //third double is on stack.
+                            to = MoveOperand(StackPointer, stackForCall_);
+                            stackForCall_ += sizeof(double);
+                            enoughMemory_ &= moveResolver_.addMove(from, to, MoveOp::DOUBLE);
+                        } else if ( passedArgsBits_[1] == 2) { //second is int, 
+                            //third is on ($6, $7)
+                            JS_ASSERT(from.isFloatReg());
+                            FloatRegister temp1 = from.floatReg();
+                            FloatRegister temp2 = js::jit::FloatRegister::FromCode(temp1.code() + 1);
+                            MoveOperand from1 = MoveOperand(temp1);
+                            MoveOperand from2 = MoveOperand(temp2);
+
+                            GetArgReg(passedArgsfake_, &destReg); 
+                            to = MoveOperand(destReg);
+                            enoughMemory_ &= moveResolver_.addMove(from1, to, MoveOp::GENERAL);
+
+                            passedArgsfake_++; //for align reason.
+                            GetArgReg(passedArgsfake_, &destReg); 
+                            to = MoveOperand(destReg);
+                            enoughMemory_ &= moveResolver_.addMove(from2, to, MoveOp::GENERAL);
+                        }
+                    } else {
+                        JS_ASSERT(0);
+                    }
+                } else { // third is int
+                    passedArgsBits_[2] = 2;
+                    if (passedArgsBits_[0] == 1) { //first is double, 
+                        if (passedArgsBits_[1] == 1) { //second is double, passedArgsfake_==5 then, impossible here
+                            JS_ASSERT(0);
+                        } else if ( passedArgsBits_[1] == 2) { //second is int, 
+                            //thired store on $7
+                            GetArgReg(passedArgsfake_, &destReg); 
+                            to = MoveOperand(destReg);
+                            enoughMemory_ &= moveResolver_.addMove(from, to, MoveOp::GENERAL);
+                        } else {
+                            JS_ASSERT(0);
+                        }
+                    } else if (passedArgsBits_[0] == 2) { //first is int
+                        if (passedArgsBits_[1] == 1) { //second is double, passedArgsfake_ == 5 then, impossible here.
+                            JS_ASSERT(0);
+                        } else if ( passedArgsBits_[1] == 2) { //second is int, 
+                            //thired store on $6
+                            GetArgReg(passedArgsfake_, &destReg);
+                            to = MoveOperand(destReg);
+                            enoughMemory_ &= moveResolver_.addMove(from, to, MoveOp::GENERAL);
+                        } else {
+                            JS_ASSERT(0);
+                        }
+                    } else { //impossible here
+                        JS_ASSERT(0);
+                    }
+                }
+                break;
+            case 4:
+                if (from.isDouble()) { //forth is double, store on stack
+                    passedArgsBits_[3] = 1;
+                    to = MoveOperand(StackPointer, stackForCall_);
+                    stackForCall_ += sizeof(double);
+                    enoughMemory_ &= moveResolver_.addMove(from, to, MoveOp::DOUBLE);
+                    passedArgsfake_++; //for align reason.
+                } else { // forth is int, store on $7
+                    passedArgsBits_[3] = 2;
+                    GetArgReg(passedArgsfake_, &destReg); 
+                    to = MoveOperand(destReg);
+                    enoughMemory_ &= moveResolver_.addMove(from, to, MoveOp::GENERAL);
+                }
+                break;
+            default:
+                JS_ASSERT(0);
         }
-    } else {
-#if 1
+    } else { //args > 4, store on stack.
         to = MoveOperand(StackPointer, stackForCall_);
         if (from.isDouble()) {
             stackForCall_ += sizeof(double);
@@ -199,7 +330,6 @@ MacroAssemblerMIPS::passABIArg(const MoveOperand &from)
             stackForCall_ += sizeof(int32_t);
             enoughMemory_ &= moveResolver_.addMove(from, to, MoveOp::GENERAL);
         }
-#endif
     }
 }
 
