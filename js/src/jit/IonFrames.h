@@ -22,7 +22,8 @@ typedef void * CalleeToken;
 enum CalleeTokenTag
 {
     CalleeToken_Function = 0x0, // untagged
-    CalleeToken_Script = 0x1
+    CalleeToken_Script = 0x1,
+    CalleeToken_ParallelFunction = 0x2  //author:huangwenjun date:2013-12-26
 };
 
 static inline CalleeTokenTag

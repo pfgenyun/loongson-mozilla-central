@@ -1248,6 +1248,38 @@ MacroAssembler::assumeUnreachable(const char *output)
     breakpoint();
 }
 
+//author:huangwenjun date:2013-12-26
+
+void
+MacroAssembler::tagCallee(Register callee, ExecutionMode mode)
+{
+    switch (mode) {
+      case SequentialExecution:
+        // CalleeToken_Function is untagged, so we don't need to do anything.
+        return;
+      case ParallelExecution:
+        orPtr(Imm32(CalleeToken_ParallelFunction), callee);
+        return;
+      default:
+        MOZ_ASSUME_UNREACHABLE("No such execution mode");
+    }
+}
+
+void
+MacroAssembler::clearCalleeTag(Register callee, ExecutionMode mode)
+{
+    switch (mode) {
+      case SequentialExecution:
+        // CalleeToken_Function is untagged, so we don't need to do anything.
+        return;
+      case ParallelExecution:
+        andPtr(Imm32(~0x3), callee);
+        return;
+      default:
+        MOZ_ASSUME_UNREACHABLE("No such execution mode");
+    }    
+}
+
 static void
 Printf0_(const char *output) {
     printf("%s", output);

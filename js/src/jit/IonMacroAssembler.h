@@ -919,6 +919,10 @@ class MacroAssembler : public MacroAssemblerSpecific
         test32(Address(scratch, Class::offsetOfFlags()), Imm32(JSCLASS_EMULATES_UNDEFINED));
         return truthy ? Assembler::Zero : Assembler::NonZero;
     }
+    
+    //author:huangwenjun date:2013-12-26
+    void tagCallee(Register callee, ExecutionMode mode);
+    void clearCalleeTag(Register callee, ExecutionMode mode);
 
   private:
     // These two functions are helpers used around call sites throughout the
@@ -1076,8 +1080,9 @@ class MacroAssembler : public MacroAssemblerSpecific
         loadBaselineFramePtr(framePtr, scratch);
         push(scratch);
     }
-
+  #ifndef JS_CPU_MIPS
   private:
+  #endif
     void handleFailure(ExecutionMode executionMode);
 
   public:
