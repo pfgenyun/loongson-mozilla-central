@@ -49,6 +49,12 @@ namespace JSC {
         staticSpew("##setRel32 ((from=%p)) ((to=%p))", from, to);
         setInt32(from, offset);
     }
+    //author:huangwenjun date:2013-12-24
+    unsigned MIPSAssembler::getCallReturnOffset(JmpSrc call)
+    {
+        // The return address is after a call and a delay slot instruction
+        return call.m_offset;
+    }
 
     //author:huangwenjun date:2013-12-24
     bool MIPSAssembler::nextJump(const JmpSrc& from, JmpSrc* next)
@@ -116,11 +122,11 @@ namespace JSC {
         ASSERT(from.m_offset != -1);
         MIPSWord* insn = reinterpret_cast<MIPSWord*>(reinterpret_cast<intptr_t>(code) + from.m_offset);
 
-        ASSERT(!(*(insn - 1)) && !(*(insn - 2)) && !(*(insn - 3)) && !(*(insn - 5)));
+        ASSERT((!(*(insn - 1)) && !(*(insn - 2)) && !(*(insn - 3)) && !(*(insn - 5))));
         insn = insn - 6;
         linkWithOffset(insn, to);
     }
-    
+
     //author:huangwenjun date:2013-12-23
     bool MIPSAssembler::canRelinkJump(void* from, void* to)
     {
@@ -156,7 +162,7 @@ namespace JSC {
         ASSERT((*insn & 0xfc000000) == 0x34000000); // ori
         *insn = (*insn & 0xffff0000) | (reinterpret_cast<intptr_t>(to) & 0xffff);
     }
-    
+
     //author:huangwenjun date:2013-12-23
     void MIPSAssembler::relinkJump(void* from, void* to)
     {
@@ -183,6 +189,49 @@ namespace JSC {
         ExecutableAllocator::cacheFlush(start, size);
     }
     
+    //author:huangwenjun date:2013-12-26
+    void MIPSAssembler::repatchInt32(void* from, int32_t to)
+    {
+        MIPSWord* insn = reinterpret_cast<MIPSWord*>(from);
+        ASSERT((*insn & 0xffe00000) == 0x3c000000); // lui
+        *insn = (*insn & 0xffff0000) | ((to >> 16) & 0xffff);
+        insn++;
+        ASSERT((*insn & 0xfc000000) == 0x34000000); // ori
+        *insn = (*insn & 0xffff0000) | (to & 0xffff);
+        insn--;
+        ExecutableAllocator::cacheFlush(insn, 2 * sizeof(MIPSWord));
+    }
+
+    void MIPSAssembler::repatchPointer(void* from, void* to)
+    {
+        repatchInt32(from, reinterpret_cast<int32_t>(to));
+    }
+    
+    void MIPSAssembler::repatchLoadPtrToLEA(void* from)
+    {
+        MIPSWord* insn = reinterpret_cast<MIPSWord*>(from);
+        insn = insn + 3;
+        ASSERT((*insn & 0xfc000000) == 0x8c000000); // lw
+        /* lw -> addiu */
+        *insn = 0x24000000 | (*insn & 0x03ffffff);
+
+        ExecutableAllocator::cacheFlush(insn, sizeof(MIPSWord));
+    }    
+    
+    void MIPSAssembler::repatchLEAToLoadPtr(void* from)
+    {
+          MIPSWord* insn = reinterpret_cast<MIPSWord*>(from);
+          insn = insn + 3;
+          if ((*insn & 0xfc000000) == 0x8c000000)
+            return; // Valid lw instruction
+  
+          ASSERT((*insn & 0xfc000000) == 0x24000000); // addiu
+          /* addiu -> lw */
+          *insn = 0x8c000000 | (*insn & 0x03ffffff);
+  
+          ExecutableAllocator::cacheFlush(insn, sizeof(MIPSWord));
+    }
+
     //author:huangwenjun date:2013-12-23
     int MIPSAssembler::linkWithOffset(MIPSWord* insn, void* to)
     {
@@ -239,8 +288,8 @@ namespace JSC {
             }
 
             insn = insn + 2;
-            if ((reinterpret_cast<intptr_t>(insn) + 4) >> 28
-                == reinterpret_cast<intptr_t>(to) >> 28) {
+            if (0 && ((reinterpret_cast<intptr_t>(insn) + 4) >> 28
+                == reinterpret_cast<intptr_t>(to) >> 28)) {
                 *insn = 0x08000000 | ((reinterpret_cast<intptr_t>(to) >> 2) & 0x3ffffff);
                 *(insn + 1) = 0;
                 return 4 * sizeof(MIPSWord);
@@ -279,7 +328,8 @@ namespace JSC {
                 int oldTargetAddress = (topFourBits << 28) | (offset << 2);
                 int newTargetAddress = oldTargetAddress - (int)oldBase + (int)newBase;
                 int newInsnAddress = (int)insn;
-                if (((newInsnAddress + 4) >> 28) == (newTargetAddress >> 28))
+                //if (((newInsnAddress + 4) >> 28) == (newTargetAddress >> 28))
+                if (0 && (((newInsnAddress + 4) >> 28) == (newTargetAddress >> 28)))
                     *insn = 0x08000000 | ((newTargetAddress >> 2) & 0x3ffffff);
                 else {
                     /* lui */
@@ -293,6 +343,7 @@ namespace JSC {
                 int high = (*insn & 0xffff) << 16;
                 int low = *(insn + 1) & 0xffff;
                 int oldTargetAddress = high | low;
+                if((oldTargetAddress >= -(m_buffer.size()) || oldTargetAddress >= -128) && oldTargetAddress <= m_buffer.size()) continue;
                 int newTargetAddress = oldTargetAddress - (int)oldBase + (int)newBase;
                 /* lui */
                 *insn = 0x3c000000 | (MIPSRegisters::t9 << OP_SH_RT) | ((newTargetAddress >> 16) & 0xffff);
@@ -322,6 +373,12 @@ namespace JSC {
             /* jalr $25 */
             *(insn + 2) = 0x0000f809 | (MIPSRegisters::t9 << OP_SH_RS);
             return 3 * sizeof(MIPSWord);
+        } else if((*(insn + 2) & 0xffff0000) == 0x04110000) {//bal
+            intptr_t offset = reinterpret_cast<intptr_t>(to) >> 2;
+            if(reinterpret_cast<intptr_t>(to) > 0x100000)
+                offset = reinterpret_cast<intptr_t>(to) - reinterpret_cast<intptr_t>(from);
+            *(insn + 2) = 0x04110000 | ((offset >> 2) & 0xffff);
+            return sizeof(MIPSWord);
         }
 
         ASSERT((*insn & 0xffe00000) == 0x3c000000); // lui

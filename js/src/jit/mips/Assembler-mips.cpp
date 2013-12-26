@@ -481,9 +481,9 @@ Assembler::patchWrite_NearCall(CodeLocationLabel startLabel, CodeLocationLabel t
     unsigned tolw, tohg;
     tohg = (unsigned int)to>>16;
     tolw = (unsigned int)to&0xffff;
-    
+
     *(start + 4) = 0x3c190000 | tohg;   //lui t9, hg
-    *(start + 5) = 0x37390000 | tolw; //ori t9 t9,hg
+    *(start + 5) = 0x37390000 | tolw; //ori t9 t9,hw
     *(start + 6) = 0x0320f809;  //jalr t9
     *(start + 7) = 0x00000000;  //nop
 }

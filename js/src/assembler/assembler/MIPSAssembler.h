@@ -524,7 +524,7 @@ public:
         int value = 512; /* BRK_BUG */
         emitInst(0x0000000d | ((value & 0x3ff) << OP_SH_CODE));
     }
-    
+
     // xsb: fix me.
     void bal(int imm)
     {
@@ -912,11 +912,7 @@ public:
     // by xsb; fix me
     static void setRe132(void* from, void* to);
 
-    static unsigned getCallReturnOffset(JmpSrc call)
-    {
-        // The return address is after a call and a delay slot instruction
-        return call.m_offset;
-    }
+    static unsigned getCallReturnOffset(JmpSrc call);
 
     // Linking & patching:
     //
@@ -936,47 +932,13 @@ public:
     static void relinkJump(void* from, void* to);
     static void relinkCall(void* from, void* to);
 
-    static void repatchInt32(void* from, int32_t to)
-    {
-        MIPSWord* insn = reinterpret_cast<MIPSWord*>(from);
-        ASSERT((*insn & 0xffe00000) == 0x3c000000); // lui
-        *insn = (*insn & 0xffff0000) | ((to >> 16) & 0xffff);
-        insn++;
-        ASSERT((*insn & 0xfc000000) == 0x34000000); // ori
-        *insn = (*insn & 0xffff0000) | (to & 0xffff);
-        insn--;
-        ExecutableAllocator::cacheFlush(insn, 2 * sizeof(MIPSWord));
-    }
+    static void repatchInt32(void* from, int32_t to);
 
-    static void repatchPointer(void* from, void* to)
-    {
-        repatchInt32(from, reinterpret_cast<int32_t>(to));
-    }
+    static void repatchPointer(void* from, void* to);
 
-    static void repatchLoadPtrToLEA(void* from)
-    {
-        MIPSWord* insn = reinterpret_cast<MIPSWord*>(from);
-        insn = insn + 3;
-        ASSERT((*insn & 0xfc000000) == 0x8c000000); // lw
-        /* lw -> addiu */
-        *insn = 0x24000000 | (*insn & 0x03ffffff);
+    static void repatchLoadPtrToLEA(void* from);
 
-        ExecutableAllocator::cacheFlush(insn, sizeof(MIPSWord));
-    }
-
-    static void repatchLEAToLoadPtr(void* from)
-    {
-        MIPSWord* insn = reinterpret_cast<MIPSWord*>(from);
-        insn = insn + 3;
-        if ((*insn & 0xfc000000) == 0x8c000000)
-          return; // Valid lw instruction
-
-        ASSERT((*insn & 0xfc000000) == 0x24000000); // addiu
-        /* addiu -> lw */
-        *insn = 0x8c000000 | (*insn & 0x03ffffff);
-
-        ExecutableAllocator::cacheFlush(insn, sizeof(MIPSWord));
-    }
+    static void repatchLEAToLoadPtr(void* from);
 
     // Like Lua's emitter, we thread jump lists through the unpatched target
     // field, which will get fixed up when the label (which has a pointer to

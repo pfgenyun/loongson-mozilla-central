@@ -947,16 +947,13 @@ class Assembler
         Register regZero = zero;
         Register tmp = dataTempRegister;
         int to = (int)(target.value);
-        //int to = (int)(target);
 
         if (cond == Equal || cond == Zero)
         {
-           //masm.bne(left.code(), right.code(), 4);
            bne(left, right, 4);
         }
         else if (cond == NotEqual || cond == NonZero)
         {
-            //masm.beq(left.code(), right.code(), 4);
             beq(left, right, 4);
         }
         else if (cond == Above) {
@@ -985,12 +982,12 @@ class Assembler
         }
         else if (cond == LessThan) {
             slt(tmp, left, right);
-         beq(tmp, regZero, 4);
+            beq(tmp, regZero, 4);
         }
         else if (cond == LessThanOrEqual) {
             slt(tmp, right, left);
             bne(tmp, regZero, 4);
-         }
+        }
         else if (cond == Overflow) {
         /*
             xor     cmpTemp, left, right
@@ -1007,7 +1004,7 @@ class Assembler
 
           No_overflow:
         */
-        xorInsn(tmp, left, right);
+            xorInsn(tmp, left, right);
             bgez(tmp, 8);
             nop();
             subu(tmp, left, right);
@@ -1586,7 +1583,7 @@ class Assembler
 
     // author: huangwenjun date:2013-12-23
     void writeCodePointer(AbsoluteLabel *label) {
-         JS_ASSERT(!label->bound());
+        JS_ASSERT(!label->bound());
         // Thread the patch list through the unpatched address word in the
         // instruction stream.
         masm.emitInst(label->prev());
@@ -2415,8 +2412,11 @@ class Assembler
         if (label->used()&&(label->getType())) {//1 jump table
             intptr_t src = label->offset();
             do {
-                intptr_t next =*((intptr_t*)(raw + src-5));//date:1108
-                *((int*)(raw + src-4)) = (int)address;
+                //intptr_t next = reinterpret_cast<intptr_t>(JSC::MIPSAssembler::getPointer(raw + src));
+                //JSC::MIPSAssembler::setPointer(raw + src, address);
+                intptr_t next =*((intptr_t*)(raw + src-4));//date:1108
+		*((int*)(raw + src-4)) = (int)address;
+
                 src = next;
             } while (src != AbsoluteLabel::INVALID_OFFSET);
         } else if (label->used()&&(!label->getType())) {
@@ -3531,7 +3531,7 @@ class Assembler
     {
         masm.lui(rt.code(), imm.value);
     }
-       
+
     // by wangqing, overloaded lui 
     void lui(const Register &rt, int32_t imm)
     {
