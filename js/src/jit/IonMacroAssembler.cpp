@@ -991,7 +991,7 @@ MacroAssembler::generateBailoutTail(Register scratch, Register bailoutInfo)
             // Discard exit frame.
             addPtr(Imm32(IonExitFrameLayout::SizeWithFooter()), StackPointer);
 
-#if defined(JS_CPU_X86) || defined(JS_CPU_X64)
+#if defined(JS_CPU_X86) || defined(JS_CPU_X64) || defined (JS_CPU_MIPS)
             push(BaselineTailCallReg);
 #endif
             jump(Address(BaselineStubReg, ICStub::offsetOfStubCode()));
