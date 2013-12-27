@@ -647,10 +647,6 @@ JitRuntime::generateVMWrapper(JSContext *cx, const VMFunction &f)
 
       case Type_Int32:
       case Type_Pointer:
-        outReg = regs.takeAny();
-        masm.reserveStack(sizeof(int32_t));
-        masm.movl(sp, outReg);
-        break;
       case Type_Bool:
         outReg = regs.takeAny();
         masm.reserveStack(sizeof(int32_t));
@@ -659,9 +655,8 @@ JitRuntime::generateVMWrapper(JSContext *cx, const VMFunction &f)
 
       case Type_Double:
         outReg = regs.takeAny();
-        masm.reserveStack(sizeof(float));
-        //TODO
-        //masm.movl(esp, outReg);
+        masm.reserveStack(sizeof(double));
+        masm.movl(sp, outReg);
         break;
 
       default:

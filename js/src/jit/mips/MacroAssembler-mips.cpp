@@ -453,7 +453,7 @@ MacroAssemblerMIPS::handleFailureWithHandler(void *handler)
     callWithABI(handler);
 
     IonCode *excTail = GetIonContext()->runtime->jitRuntime()->getExceptionTail();
-    jmp(excTail);
+    //jmp(excTail);
 }
 
 //author:huangwenjun date:2013-12-26
@@ -473,7 +473,7 @@ MacroAssemblerMIPS::handleFailureWithHandlerTail()
     branch32(Assembler::Equal, t6, Imm32(ResumeFromException::RESUME_CATCH), &catch_);
     branch32(Assembler::Equal, t6, Imm32(ResumeFromException::RESUME_FINALLY), &finally);
     branch32(Assembler::Equal, t6, Imm32(ResumeFromException::RESUME_FORCED_RETURN), &return_);
-    branch32(Assembler::Equal, t6, Imm32(ResumeFromException::RESUME_BAILOUT), &bailout);
+    //branch32(Assembler::Equal, t6, Imm32(ResumeFromException::RESUME_BAILOUT), &bailout);
 
     breakpoint(); // Invalid kind.
 
@@ -515,13 +515,14 @@ MacroAssemblerMIPS::handleFailureWithHandlerTail()
     movl(fp, sp);
     pop(fp);
     ret();
-
+    
+    //author:huangwenjun date:2013-12-27 just for test
     // If we are bailing out to baseline to handle an exception, jump to
     // the bailout tail stub.
-    bind(&bailout);
-    loadPtr(Address(sp, offsetof(ResumeFromException, bailoutInfo)), t8);
-    movl(Imm32(BAILOUT_RETURN_OK), t6);
-    jmp(Operand(sp, offsetof(ResumeFromException, target)));
+    //bind(&bailout);
+    //loadPtr(Address(sp, offsetof(ResumeFromException, bailoutInfo)), t8);
+    //movl(Imm32(BAILOUT_RETURN_OK), t6);
+    //jmp(Operand(sp, offsetof(ResumeFromException, target)));
 
 }
 
