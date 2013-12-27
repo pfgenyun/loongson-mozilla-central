@@ -1817,6 +1817,77 @@ CodeGeneratorMIPS::visitFloorF(LFloorF *lir)
     return true;
 }
 
+//bool
+//CodeGeneratorMIPS::visitRound(LRound *lir)
+//{
+//    FloatRegister input = ToFloatRegister(lir->input());
+//    FloatRegister temp = ToFloatRegister(lir->temp());
+//    FloatRegister scratch = ScratchFloatReg;
+//    Register output = ToRegister(lir->output());
+//
+//    Label negative, end;
+//
+//    // Load 0.5 in the temp register.
+//    masm.loadConstantDouble(0.5, temp);
+//
+//    // Branch to a slow path for negative inputs. Doesn't catch NaN or -0.
+//    masm.xorpd(scratch, scratch);
+//    masm.branchDouble(Assembler::DoubleLessThan, input, scratch, &negative);
+//
+//    // Bail on negative-zero.
+//    Assembler::Condition bailCond = masm.testNegativeZero(input, output);
+//    if (!bailoutIf(bailCond, lir->snapshot()))
+//        return false;
+//
+//    // Input is non-negative. Add 0.5 and truncate, rounding down. Note that we
+//    // have to add the input to the temp register (which contains 0.5) because
+//    // we're not allowed to modify the input register.
+//    masm.addsd(input, temp);
+//
+//    masm.cvttsd2si(temp, output);
+//    masm.cmp32(output, Imm32(0x7fffffff));
+//    if (!bailoutIf(Assembler::Equal, lir->snapshot()))
+//        return false;
+//
+//    masm.jump(&end);
+//
+//
+//    // Input is negative, but isn't -0.
+//    masm.bind(&negative);
+//
+//    { 
+//        masm.addsd(input, temp);
+//
+//        // Round toward -Infinity without the benefit of ROUNDSD.
+//        {
+//            // If input + 0.5 >= 0, input is a negative number >= -0.5 and the result is -0.
+//            masm.compareDouble(Assembler::DoubleGreaterThanOrEqual, temp, scratch);
+//            if (!bailoutIf(Assembler::DoubleGreaterThanOrEqual, lir->snapshot()))
+//                return false;
+//
+//            // Truncate and round toward zero.
+//            // This is off-by-one for everything but integer-valued inputs.
+//            masm.cvttsd2si(temp, output);
+//            masm.cmp32(output, Imm32(0x7fffffff));
+//            if (!bailoutIf(Assembler::Equal, lir->snapshot()))
+//                return false;
+//
+//            // Test whether the truncated double was integer-valued.
+//            masm.convertInt32ToDouble(output, scratch);
+//            masm.branchDouble(Assembler::DoubleEqualOrUnordered, temp, scratch, &end);
+//
+//            // Input is not integer-valued, so we rounded off-by-one in the
+//            // wrong direction. Correct by subtraction.
+//            masm.subl(Imm32(1), output);
+//            // Cannot overflow: output was already checked against INT_MIN.
+//        }
+//    }
+//
+//    masm.bind(&end);
+//    return true;
+//}
+
+// Old visitRound version, by weizhenwei, 2013.12.27
 bool
 CodeGeneratorMIPS::visitRound(LRound *lir)
 {
@@ -1828,10 +1899,14 @@ CodeGeneratorMIPS::visitRound(LRound *lir)
     Label negative, end;
 
     // Load 0.5 in the temp register.
+    //static const double PointFive = 0.5;
+    //masm.loadStaticDouble(&PointFive, temp);
     masm.loadConstantDouble(0.5, temp);
 
     // Branch to a slow path for negative inputs. Doesn't catch NaN or -0.
-    masm.xorpd(scratch, scratch);
+    //masm.xorpd(scratch, scratch);
+    //by weizhenwei, 2013.11.08
+    masm.zerod(scratch);
     masm.branchDouble(Assembler::DoubleLessThan, input, scratch, &negative);
 
     // Bail on negative-zero.
@@ -1845,7 +1920,7 @@ CodeGeneratorMIPS::visitRound(LRound *lir)
     masm.addsd(input, temp);
 
     masm.cvttsd2si(temp, output);
-    masm.cmp32(output, Imm32(0x7fffffff));
+    masm.cmp32(output, Imm32(INT_MIN));
     if (!bailoutIf(Assembler::Equal, lir->snapshot()))
         return false;
 
@@ -1855,33 +1930,33 @@ CodeGeneratorMIPS::visitRound(LRound *lir)
     // Input is negative, but isn't -0.
     masm.bind(&negative);
 
-    { 
         masm.addsd(input, temp);
 
         // Round toward -Infinity without the benefit of ROUNDSD.
+        Label testZero;
         {
-            // If input + 0.5 >= 0, input is a negative number >= -0.5 and the result is -0.
-            masm.compareDouble(Assembler::DoubleGreaterThanOrEqual, temp, scratch);
-            if (!bailoutIf(Assembler::DoubleGreaterThanOrEqual, lir->snapshot()))
-                return false;
-
             // Truncate and round toward zero.
             // This is off-by-one for everything but integer-valued inputs.
             masm.cvttsd2si(temp, output);
-            masm.cmp32(output, Imm32(0x7fffffff));
+            masm.cmp32(output, Imm32(INT_MIN));
             if (!bailoutIf(Assembler::Equal, lir->snapshot()))
                 return false;
 
             // Test whether the truncated double was integer-valued.
-            masm.convertInt32ToDouble(output, scratch);
-            masm.branchDouble(Assembler::DoubleEqualOrUnordered, temp, scratch, &end);
+            masm.cvtsi2sd(output, scratch);
+            masm.branchDouble(Assembler::DoubleEqualOrUnordered, temp, scratch, &testZero);
 
             // Input is not integer-valued, so we rounded off-by-one in the
             // wrong direction. Correct by subtraction.
             masm.subl(Imm32(1), output);
             // Cannot overflow: output was already checked against INT_MIN.
+
+            // Fall through to testZero.
         }
-    }
+
+        masm.bind(&testZero);
+        if (!bailoutIf(Assembler::Zero, lir->snapshot()))
+            return false;
 
     masm.bind(&end);
     return true;
