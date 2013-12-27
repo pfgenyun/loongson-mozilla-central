@@ -76,13 +76,13 @@ public:
         LessThanOrEqual,
         Overflow,
         Signed,
-		NotSigned,
+	NotSigned,
         Zero,
         NonZero
     };
 
     enum DoubleCondition {
-        DoubleUnordered, 
+        DoubleUnordered,
         DoubleOrdered,
         DoubleEqual,
         DoubleNotEqual,
@@ -1667,81 +1667,7 @@ public:
         return branch32(cond, dataTempRegister, immTempRegister);
     }
 
-    Jump branch32(Condition cond, RegisterID left, RegisterID right)
-    {
-        if (cond == Equal || cond == Zero)
-            return branchEqual(left, right);
-        if (cond == NotEqual || cond == NonZero)
-            return branchNotEqual(left, right);
-        if (cond == Above) {
-            m_assembler.sltu(cmpTempRegister, right, left);
-            return branchNotEqual(cmpTempRegister, MIPSRegisters::zero);
-        }
-        if (cond == AboveOrEqual) {
-            m_assembler.sltu(cmpTempRegister, left, right);
-            return branchEqual(cmpTempRegister, MIPSRegisters::zero);
-        }
-        if (cond == Below) {
-            m_assembler.sltu(cmpTempRegister, left, right);
-            return branchNotEqual(cmpTempRegister, MIPSRegisters::zero);
-        }
-        if (cond == BelowOrEqual) {
-            m_assembler.sltu(cmpTempRegister, right, left);
-            return branchEqual(cmpTempRegister, MIPSRegisters::zero);
-        }
-        if (cond == GreaterThan) {
-            m_assembler.slt(cmpTempRegister, right, left);
-            return branchNotEqual(cmpTempRegister, MIPSRegisters::zero);
-        }
-        if (cond == GreaterThanOrEqual) {
-            m_assembler.slt(cmpTempRegister, left, right);
-            return branchEqual(cmpTempRegister, MIPSRegisters::zero);
-        }
-        if (cond == LessThan) {
-            m_assembler.slt(cmpTempRegister, left, right);
-            return branchNotEqual(cmpTempRegister, MIPSRegisters::zero);
-        }
-        if (cond == LessThanOrEqual) {
-            m_assembler.slt(cmpTempRegister, right, left);
-            return branchEqual(cmpTempRegister, MIPSRegisters::zero);
-        }
-        if (cond == Overflow) {
-            /*
-                xor     cmpTemp, left, right
-                bgez    No_overflow, cmpTemp    # same sign bit -> no overflow
-                nop
-                subu    cmpTemp, left, right
-                xor     cmpTemp, cmpTemp, left
-                bgez    No_overflow, cmpTemp    # same sign bit -> no overflow
-                nop
-                b       Overflow
-                nop
-                nop
-                nop
-                nop
-                nop
-              No_overflow:
-            */
-            m_assembler.xorInsn(cmpTempRegister, left, right);
-            m_assembler.bgez(cmpTempRegister, 11);
-            m_assembler.nop();
-            m_assembler.subu(cmpTempRegister, left, right);
-            m_assembler.xorInsn(cmpTempRegister, cmpTempRegister, left);
-            m_assembler.bgez(cmpTempRegister, 7);
-            m_assembler.nop();
-            return jump();
-        }
-        if (cond == Signed) {
-            m_assembler.subu(cmpTempRegister, left, right);
-            // Check if the result is negative.
-            m_assembler.slt(cmpTempRegister, cmpTempRegister,
-                            MIPSRegisters::zero);
-            return branchNotEqual(cmpTempRegister, MIPSRegisters::zero);
-        }
-        ASSERT(0);
-
-        return Jump();
-    }
+    Jump branch32(Condition cond, RegisterID left, RegisterID right);
 
     Jump branch32(Condition cond, RegisterID left, TrustedImm32 right)
     {
@@ -2101,46 +2027,15 @@ public:
         m_assembler.bkpt();
     }
 
-    Call nearCall()
-    {
-        /* We need two words for relaxation.  */
-        m_assembler.nop();
-        m_assembler.nop();
-        m_assembler.jal();
-        m_assembler.nop();
-        return Call(m_assembler.newJmpSrc(), Call::LinkableNear);
-    }
+    Call nearCall();
 
-    Call call()
-    {
-        m_assembler.lui(MIPSRegisters::t9, 0);
-        m_assembler.ori(MIPSRegisters::t9, MIPSRegisters::t9, 0);
-        m_assembler.jalr(MIPSRegisters::t9);
-        m_assembler.nop();
-        return Call(m_assembler.newJmpSrc(), Call::Linkable);
-    }
+    Call call();
 
     Call callRel();
 
-    Call call(RegisterID target)
-    {
-        // reserve space for patching
-        m_assembler.nop();
-        m_assembler.nop();
-        m_assembler.jalr(target);
-        m_assembler.nop();
-        return Call(m_assembler.newJmpSrc(), Call::None);
-    }
+    Call call(RegisterID target);
 
-    Call call(Address address)
-    {
-        m_fixedWidth = true;
-        load32(address, MIPSRegisters::t9);
-        m_assembler.jalr(MIPSRegisters::t9);
-        m_assembler.nop();
-        m_fixedWidth = false;
-        return Call(m_assembler.newJmpSrc(), Call::None);
-    }
+    Call call(Address address);
 
     void offsetFromPCToV0(int offset);
 
@@ -3095,7 +2990,7 @@ public:
         m_assembler.mtc1(MIPSRegisters::zero, FPRegisterID(dest + 1));
 #endif
     }
-    
+
     //ion helper
     void truncateDoubleToInt32(FPRegisterID src, RegisterID dest)
     {

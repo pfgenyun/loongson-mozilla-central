@@ -36,6 +36,112 @@
 
 using namespace JSC;
 
+MacroAssemblerMIPS::Jump 
+MacroAssemblerMIPS::branch32(Condition cond, RegisterID left, RegisterID right)
+{
+    if (cond == Equal || cond == Zero)
+        return branchEqual(left, right);
+    if (cond == NotEqual || cond == NonZero)
+        return branchNotEqual(left, right);
+    if (cond == Above) {
+        m_assembler.sltu(cmpTempRegister, right, left);
+        return branchNotEqual(cmpTempRegister, MIPSRegisters::zero);
+    }
+    if (cond == AboveOrEqual) {
+        m_assembler.sltu(cmpTempRegister, left, right);
+        return branchEqual(cmpTempRegister, MIPSRegisters::zero);
+    }
+    if (cond == Below) {
+        m_assembler.sltu(cmpTempRegister, left, right);
+        return branchNotEqual(cmpTempRegister, MIPSRegisters::zero);
+    }
+    if (cond == BelowOrEqual) {
+        m_assembler.sltu(cmpTempRegister, right, left);
+        return branchEqual(cmpTempRegister, MIPSRegisters::zero);
+    }
+    if (cond == GreaterThan) {
+        m_assembler.slt(cmpTempRegister, right, left);
+        return branchNotEqual(cmpTempRegister, MIPSRegisters::zero);
+    }
+    if (cond == GreaterThanOrEqual) {
+        m_assembler.slt(cmpTempRegister, left, right);
+        return branchEqual(cmpTempRegister, MIPSRegisters::zero);
+    }
+    if (cond == LessThan) {
+        m_assembler.slt(cmpTempRegister, left, right);
+        return branchNotEqual(cmpTempRegister, MIPSRegisters::zero);
+    }
+    if (cond == LessThanOrEqual) {
+        m_assembler.slt(cmpTempRegister, right, left);
+        return branchEqual(cmpTempRegister, MIPSRegisters::zero);
+    }
+    if (cond == Overflow) {
+        /*
+            xor     cmpTemp, left, right
+            bgez    No_overflow, cmpTemp    # same sign bit -> no overflow
+            nop
+            subu    cmpTemp, left, right
+            xor     cmpTemp, cmpTemp, left
+            bgez    No_overflow, cmpTemp    # same sign bit -> no overflow
+            nop
+            b       Overflow
+            nop
+            nop
+            nop
+            nop
+            nop
+          No_overflow:
+        */
+        //author:huangwenjun date:2013-12-26
+        m_assembler.addu(dataTempRegister, MIPSRegisters::zero, left);
+        m_assembler.xorInsn(cmpTempRegister, dataTempRegister, right);
+        //m_assembler.xorInsn(cmpTempRegister, left, right);
+        m_assembler.bgez(cmpTempRegister, 11);
+        m_assembler.nop();
+        //author:huangwenjun date:2013-12-26
+        //m_assembler.subu(cmpTempRegister, left, right);
+        //m_assembler.xorInsn(cmpTempRegister, cmpTempRegister, left);
+        m_assembler.subu(cmpTempRegister, dataTempRegister, right);
+        m_assembler.xorInsn(cmpTempRegister, cmpTempRegister, dataTempRegister);
+        m_assembler.bgez(cmpTempRegister, 7);
+        m_assembler.nop();
+        return jump();
+    }
+    if (cond == Signed) {
+        m_assembler.subu(cmpTempRegister, left, right);
+        // Check if the result is negative.
+        m_assembler.slt(cmpTempRegister, cmpTempRegister,
+                        MIPSRegisters::zero);
+        return branchNotEqual(cmpTempRegister, MIPSRegisters::zero);
+    }
+    ASSERT(0);
+
+    return Jump();
+}
+
+
+//author:huangwenjun date:2013-12-26
+MacroAssemblerMIPS::Call
+MacroAssemblerMIPS::nearCall()
+{
+    /* We need two words for relaxation.  */
+    m_assembler.nop();
+    m_assembler.nop();
+    m_assembler.jal();
+    m_assembler.nop();
+    return Call(m_assembler.newJmpSrc(), Call::LinkableNear);
+}
+
+MacroAssemblerMIPS::Call
+MacroAssemblerMIPS::call()
+{
+    m_assembler.lui(MIPSRegisters::t9, 0);
+    m_assembler.ori(MIPSRegisters::t9, MIPSRegisters::t9, 0);
+    m_assembler.jalr(MIPSRegisters::t9);
+    m_assembler.nop();
+    return Call(m_assembler.newJmpSrc(), Call::Linkable);
+}
+
 MacroAssemblerMIPS::Call 
 MacroAssemblerMIPS::callRel()
 {
@@ -44,6 +150,28 @@ MacroAssemblerMIPS::callRel()
     m_assembler.bal(0);
     m_assembler.nop();
     return Call(m_assembler.newJmpSrc(), Call::Linkable);
+}
+
+MacroAssemblerMIPS::Call
+MacroAssemblerMIPS::call(RegisterID target)
+{
+    // reserve space for patching
+    m_assembler.nop();
+    m_assembler.nop();
+    m_assembler.jalr(target);
+    m_assembler.nop();
+    return Call(m_assembler.newJmpSrc(), Call::None);
+}
+
+MacroAssemblerMIPS::Call
+MacroAssemblerMIPS::call(Address address)
+{
+    m_fixedWidth = true;
+    load32(address, MIPSRegisters::t9);
+    m_assembler.jalr(MIPSRegisters::t9);
+    m_assembler.nop();
+    m_fixedWidth = false;
+    return Call(m_assembler.newJmpSrc(), Call::None);
 }
 
 static unsigned int* __getpc(void)
