@@ -1147,12 +1147,10 @@ class MacroAssemblerMIPS : public Assembler
         }
     //    return j;
     }
-
+    // TODO: consider cond & DoubleConditionBitInvert, weizhenwei, 3013.12.27
     void branchDouble(DoubleCondition cond, const FloatRegister &lhs,
                       const FloatRegister &rhs, Label *label)
     {
-        compareDouble(cond, lhs, rhs);
-
         if (cond == DoubleEqual) {
             Label unordered;
             branchDoubleImpl(Assembler::DoubleUnordered, lhs, rhs,  &unordered);
@@ -1179,23 +1177,21 @@ class MacroAssemblerMIPS : public Assembler
     void branchFloat(DoubleCondition cond, const FloatRegister &lhs,
                       const FloatRegister &rhs, Label *label)
     {
-        compareFloat(cond, lhs, rhs);
-
         if (cond == DoubleEqual) {
             Label unordered;
-            j(Parity, &unordered);
-            j(Equal, label);
+            branchDoubleImpl(Assembler::DoubleUnordered, lhs, rhs,  &unordered);
+            branchDoubleImpl(Assembler::DoubleEqual, lhs, rhs, label);
             bind(&unordered);
             return;
         }
         if (cond == DoubleNotEqualOrUnordered) {
-            j(NotEqual, label);
-            j(Parity, label);
+            branchDoubleImpl(Assembler::DoubleNotEqual, lhs, rhs, label);
+            branchDoubleImpl(Assembler::DoubleUnordered, lhs, rhs, label);
             return;
         }
 
         JS_ASSERT(!(cond & DoubleConditionBitSpecial));
-        j(ConditionFromDoubleCondition(cond), label);
+        branchDoubleImpl(cond, lhs, rhs, label);
     }
 
     void move32(const Imm32 &imm, const Register &dest) {
@@ -1580,8 +1576,8 @@ class MacroAssemblerMIPS : public Assembler
 //        ucomisd(src, ScratchFloatReg);
 //        j(Assembler::Parity, fail);
 //        j(Assembler::NotEqual, fail);
-        branchDouble(DoubleConditionFromCondition(Assembler::Parity), src, ScratchFloatReg, fail);
-        branchDouble(DoubleConditionFromCondition(Assembler::NotEqual), src, ScratchFloatReg, fail);
+        branchDouble(Assembler::DoubleUnordered, src, ScratchFloatReg, fail);
+        branchDouble(Assembler::DoubleNotEqual, src, ScratchFloatReg, fail);
 
         // Check for -0
         if (negativeZeroCheck) {
@@ -1610,9 +1606,11 @@ class MacroAssemblerMIPS : public Assembler
     {
         cvttss2si(src, dest);
         convertInt32ToFloat32(dest, ScratchFloatReg);
-        ucomiss(src, ScratchFloatReg);
-        j(Assembler::Parity, fail);
-        j(Assembler::NotEqual, fail);
+        //ucomiss(src, ScratchFloatReg);
+        //j(Assembler::Parity, fail);
+        //j(Assembler::NotEqual, fail);
+        branchDouble(Assembler::DoubleUnordered, src, ScratchFloatReg, fail);
+        branchDouble(Assembler::DoubleNotEqual, src, ScratchFloatReg, fail);
 
         // Check for -0
         if (negativeZeroCheck) {
