@@ -1575,7 +1575,7 @@ class Assembler
          return label;
 
     }
-    // folloing is from Assembler-x86-shared.h
+
    public:
     void align(int alignment) {
         masm.align(alignment);
@@ -1608,11 +1608,11 @@ class Assembler
 
     void movl(const Imm32 &imm32, const Register &dest) {
    //     masm.movl_i32r(imm32.value, dest.code());
-    mcss.move(mTrustedImm32(imm32.value), dest.code());
+        mcss.move(mTrustedImm32(imm32.value), dest.code());
     }
     void movl(const Register &src, const Register &dest) {
    //     masm.movl_rr(src.code(), dest.code());
-       mcss.move(src.code(), dest.code());
+        mcss.move(src.code(), dest.code());
     }
     void movl(const Operand &src, const Register &dest) {
         switch (src.kind()) {
@@ -3251,9 +3251,9 @@ class Assembler
         // uintptr_t *ptr = ((uintptr_t *) data.raw()) - 1;
         // JS_ASSERT(*ptr == expectedData.value);
         // *ptr = newData.value;
-        uint32_t old = JSC::MIPSAssembler::getInt32(data.raw());
-        JS_ASSERT(old == (uint32_t)expectedData.value);
-        JSC::MIPSAssembler::setInt32(((uint8_t *)data.raw()), *(int32_t *)(newData.value));
+        //uint32_t old = JSC::MIPSAssembler::getInt32(data.raw());
+        //JS_ASSERT(old == (uint32_t)expectedData.value);
+        //JSC::MIPSAssembler::setInt32(((uint8_t *)data.raw()), *(int32_t *)(newData.value));
         /* 
          * author: wangqing
          * date: 2013-10-18
