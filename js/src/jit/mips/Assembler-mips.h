@@ -2428,7 +2428,9 @@ class Assembler
     void ma_call(const Register &reg);//for js->c++
     void ma_call(const Operand &op);//for js->c++
     void ma_call(ImmWord target);//for js->c++
-    JmpSrc ma_call(void *dest);
+    //author:huangwenjun date:2013-12-27 not use
+    void ma_call(ImmPtr target);
+    //JmpSrc ma_call(void *dest);
 
    // calls an Ion function, assumes that the stack is untouched (8 byte alinged)
     JmpSrc ma_callIon(const Register reg);

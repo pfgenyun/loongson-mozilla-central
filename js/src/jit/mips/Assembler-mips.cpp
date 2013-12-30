@@ -334,7 +334,8 @@ Assembler::call(IonCode *target) {
 //need check
 void
 Assembler::call(ImmPtr target) {
-    JS_ASSERT(0);
+    call(ImmWord((uintptr_t)target.value));
+    //JS_ASSERT(0);
     //call(target.value);
 }
 
@@ -385,6 +386,26 @@ Assembler::ma_call(ImmWord target) {
     ori(t9,t9,to&0x0000ffff);
     ma_call(t9);
 }
+
+
+//author:huangwenjun date:2013-12-27
+//not use
+void
+Assembler::ma_call(ImmPtr target) {
+    ma_call(ImmWord((uintptr_t)(target.value)));
+}
+
+//author:huangwenjun date:2013-12-25 
+//need check
+//Assembler::JmpSrc
+//Assembler::ma_call(void *dest) // KEEP EMPTY
+//{
+//    JmpSrc src;
+//    MOZ_ASSUME_UNREACHABLE("Unexpected argument type");
+//    return  src;
+//    //ma_mov(Imm32((uint32)dest), CallReg);
+//    //as_blx(CallReg);
+//}
 
 Assembler::JmpSrc
 Assembler::callWithPush() 
@@ -445,18 +466,6 @@ Assembler::ma_callIonHalfPush(const Register r)
     mcss.push(mRegisterID(v0.code()));//2insns
     JmpSrc src = mcss.call(r.code()).m_jmp;//4insns
     return src;
-}
-
-//author:huangwenjun date:2013-12-25 
-//need check
-Assembler::JmpSrc
-Assembler::ma_call(void *dest) // KEEP EMPTY
-{
-    JmpSrc src;
-    MOZ_ASSUME_UNREACHABLE("Unexpected argument type");
-    return  src;
-    //ma_mov(Imm32((uint32)dest), CallReg);
-    //as_blx(CallReg);
 }
 
 static unsigned int* __getpc(void)

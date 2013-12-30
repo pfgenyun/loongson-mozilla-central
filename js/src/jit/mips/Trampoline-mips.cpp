@@ -386,6 +386,7 @@ JitRuntime::generateArgumentsRectifier(JSContext *cx, ExecutionMode mode, void *
 
     // Load the number of |undefined|s to push into %ecx.
     masm.loadPtr(Address(sp, IonRectifierFrameLayout::offsetOfCalleeToken()), t6);
+    masm.clearCalleeTag(t6, mode);
     masm.movzwl(Operand(t6, JSFunction::offsetOfNargs()), t8);
     masm.subl(s5, t8);
 
@@ -544,10 +545,12 @@ GenerateBailoutThunk(JSContext *cx, MacroAssembler &masm, uint32_t frameClass)
         uint32_t frameSize = FrameSizeClass::FromClass(frameClass).frameSize();
         masm.addl(Imm32(BailoutDataSize + sizeof(void *) + frameSize), sp);
     }
-
+    
+    //author:huangwenjun date:2013-12-27 for test
+    masm.generateBailoutTail(t7,s1);
     // Jump to shared bailout tail. The BailoutInfo pointer has to be in ecx.
-    IonCode *bailoutTail = cx->runtime()->jitRuntime()->getBailoutTail();
-    masm.jmp(bailoutTail);
+    //IonCode *bailoutTail = cx->runtime()->jitRuntime()->getBailoutTail();
+    //masm.jmp(bailoutTail);
 }
 
 IonCode *
@@ -766,7 +769,7 @@ JitRuntime::generateVMWrapper(JSContext *cx, const VMFunction &f)
       case Type_Double:
         if (cx->runtime()->jitSupportsFloatingPoint) {
             masm.load32(Address(sp, 0), ReturnReg);
-            masm.freeStack(sizeof(float));
+            masm.freeStack(sizeof(double));
            //masm.Pop(ReturnFloatReg);
         }
         else

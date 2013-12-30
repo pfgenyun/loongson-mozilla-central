@@ -983,6 +983,10 @@ MacroAssembler::generateBailoutTail(Register scratch, Register bailoutInfo)
 #endif
             enterMonRegs.takeUnchecked(BaselineTailCallReg);
 
+//#ifdef JS_CPU_MIPS
+//            Register jitcodeReg = enterMonRegs.takeAny();   //author:huangwenjun date:2013-12-27
+//#endif
+
             pop(BaselineStubReg);
             pop(BaselineTailCallReg);
             pop(BaselineFrameReg);
@@ -994,7 +998,12 @@ MacroAssembler::generateBailoutTail(Register scratch, Register bailoutInfo)
 #if defined(JS_CPU_X86) || defined(JS_CPU_X64) || defined (JS_CPU_MIPS)
             push(BaselineTailCallReg);
 #endif
+            //author:huangwenjun date 2013-12-27
+//#ifdef JS_CPU_MIPS
+//            jump(jitcodeReg);
+//#else
             jump(Address(BaselineStubReg, ICStub::offsetOfStubCode()));
+//#endif
         }
 
         //
