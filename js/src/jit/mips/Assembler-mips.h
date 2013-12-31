@@ -239,11 +239,11 @@ class Operand
     { }
     explicit Operand(const AbsoluteAddress &address)
       : kind_(MEM_ADDRESS32),
-        disp_(reinterpret_cast<int32_t>(address.addr))
+        disp_(static_cast<int32_t>(reinterpret_cast<intptr_t>(address.addr)))
     { }
     explicit Operand(const void *address)
       : kind_(MEM_ADDRESS32),
-        base_(reinterpret_cast<int32_t>(address))
+        disp_(static_cast<int32_t>(reinterpret_cast<intptr_t>(address)))
     { }
 
     Address toAddress() const {
