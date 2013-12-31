@@ -199,9 +199,9 @@ class Operand
 
   private:
     Kind kind_ : 4;
-    int32_t base_ : 6;   // fixme: by wangqing
     Scale scale_ : 3;
     int32_t index_ : 6;  // fixme: by wangqing
+    int32_t base_ : 6; // fixme: by wangqing  
     int32_t disp_;
 
   public:
@@ -239,7 +239,7 @@ class Operand
     { }
     explicit Operand(const AbsoluteAddress &address)
       : kind_(MEM_ADDRESS32),
-        base_(reinterpret_cast<int32_t>(address.addr))
+        disp_(reinterpret_cast<int32_t>(address.addr))
     { }
     explicit Operand(const void *address)
       : kind_(MEM_ADDRESS32),

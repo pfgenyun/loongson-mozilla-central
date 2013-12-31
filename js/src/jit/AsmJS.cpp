@@ -6561,7 +6561,7 @@ GenerateOperationCallbackExit(ModuleCompiler &m, Label *throwLabel)
     // We know that StackPointer is word-aligned, but not necessarily
     // stack-aligned, so we need to align it dynamically.
     masm.mov(StackPointer, ABIArgGenerator::NonVolatileReg);
-#if defined(JS_CPU_X86) || defined(JS_CPU_MIPS)
+#if defined(JS_CPU_X86) 
     // Ensure that at least one slot is pushed for passing 'cx' below.
     masm.push(Imm32(0));
 #endif

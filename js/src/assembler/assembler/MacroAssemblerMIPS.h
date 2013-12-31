@@ -61,7 +61,8 @@ public:
     static const RegisterID dataTemp2Register = MIPSRegisters::t4;
 
     // FP temp register
-    static const FPRegisterID fpTempRegister = MIPSRegisters::f16;
+    //static const FPRegisterID fpTempRegister = MIPSRegisters::f16;
+    static const FPRegisterID fpTempRegister = MIPSRegisters::f30;
 
     enum Condition {
         Equal,
@@ -1214,15 +1215,6 @@ public:
         }
     }
 
-    // add by wangqing, 2013-12-23
-    void store8(RegisterID src, const void* address)
-    {
-        move(ImmPtr(address), addrTempRegister);
-        //m_assembler.lui(addrTempRegister, (ImmPtr(address)).m_value >> 16);
-        //m_assembler.ori(addrTempRegister, addrTempRegister, (ImmPtr(address)).m_value & 0x0000ffff);
-        m_assembler.sb(src, addrTempRegister, 0);
-    }
-
     void store8(TrustedImm32 imm, BaseIndex address)
     {
         if (!imm.m_isPointer && !imm.m_value)
@@ -1334,15 +1326,6 @@ public:
                              immTempRegister);
             m_assembler.sh(src, addrTempRegister, address.offset);
         }
-    }
-
-    // add by wangqing, 2013-12-23
-    void store16(RegisterID src, const void* address)
-    {
-        move(ImmPtr(address), addrTempRegister);
-        //m_assembler.lui(addrTempRegister, ImmPtr(address).m_value >> 16);
-        //m_assembler.ori(addrTempRegister, addrTempRegister, ImmPtr(address).m_value & 0x0000ffff);
-        m_assembler.sh(src, addrTempRegister, 0);
     }
 
     void store16(TrustedImm32 imm, BaseIndex address)
@@ -1458,14 +1441,6 @@ public:
         }
     }
 
-    // add by wangqing, 2013-12-23
-    void store32(RegisterID src, const void* address)
-    {
-        move(ImmPtr(address), addrTempRegister);
-        //m_assembler.lui(addrTempRegister, ImmPtr(address).m_value >> 16);
-        //m_assembler.ori(addrTempRegister, addrTempRegister, ImmPtr(address).m_value & 0x0000ffff);
-        m_assembler.sw(src, addrTempRegister, 0);
-    }
     void store32(TrustedImm32 imm, BaseIndex address)
     {
         if (!imm.m_isPointer && !imm.m_value)
@@ -2523,7 +2498,7 @@ public:
         }
     }
 
-    void storeFloat(FPRegisterID src, const void* address)
+    void storeFloat(FPRegisterID src, void* address)
     {
         move(ImmPtr(address), addrTempRegister);
         m_assembler.swc1(src, addrTempRegister, 0);
@@ -2591,7 +2566,7 @@ public:
     }
     
     // add by wangqing, 2013-12-23
-    void storeDouble(FPRegisterID src, const void* address)
+    void storeDouble(FPRegisterID src, void* address)
     {
         move(ImmPtr(address), addrTempRegister); 
         //m_assembler.lui(addrTempRegister, ImmPtr(address).m_value >> 16);

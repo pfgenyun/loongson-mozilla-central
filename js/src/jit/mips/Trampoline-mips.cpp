@@ -180,6 +180,7 @@ JitRuntime::generateEnterJIT(JSContext *cx, EnterJitType type)
        Register numStackValues = regs.takeAny();
        masm.movl(Operand(fp, ARG_STACKVALUES), numStackValues);
 
+       //masm.breakpoint();
        Register jitcode = regs.takeAny();
        masm.movl(Operand(fp, ARG_JITCODE), jitcode);
 
@@ -202,6 +203,7 @@ JitRuntime::generateEnterJIT(JSContext *cx, EnterJitType type)
        masm.addPtr(Imm32(BaselineFrame::Size() + BaselineFrame::FramePointerOffset), scratch);
        masm.makeFrameDescriptor(scratch, IonFrame_BaselineJS);
        masm.push(scratch);
+       //masm.breakpoint();
        masm.push(Imm32(0)); // Fake return address.
        masm.enterFakeExitFrame();
 
@@ -219,13 +221,18 @@ JitRuntime::generateEnterJIT(JSContext *cx, EnterJitType type)
 
        JS_ASSERT(jitcode != ReturnReg);
 
+       //masm.breakpoint();
        Label error;
        masm.addPtr(Imm32(IonExitFrameLayout::SizeWithFooter()), sp);
        masm.addPtr(Imm32(BaselineFrame::Size()), framePtr);
        masm.branchTest32(Assembler::Zero, ReturnReg, ReturnReg, &error);
 
-       masm.jump(jitcode);
+       //masm.breakpoint();
 
+       masm.jump(jitcode); // error.
+
+       //masm.breakpoint();
+       
        // OOM: load error value, discard return address and previous frame
        // pointer and return.
        masm.bind(&error);
@@ -234,6 +241,8 @@ JitRuntime::generateEnterJIT(JSContext *cx, EnterJitType type)
        masm.moveValue(MagicValue(JS_ION_ERROR), JSReturnOperand);
        masm.mov(returnLabel.dest(), scratch);
        masm.jump(scratch);
+
+       //masm.breakpoint();
 
        masm.bind(&notOsr);
        masm.movl(Operand(fp, ARG_SCOPECHAIN), R1.scratchReg());
