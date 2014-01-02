@@ -857,6 +857,7 @@ class AsmJSHeapAccess
     void *patchLengthAt(uint8_t *code) const { return code + (offset_ - cmpDelta_); }
     void *patchOffsetAt(uint8_t *code) const { return code + (offset_ + opLength_); }
 #endif
+
 #if defined(JS_CPU_X86) || defined(JS_CPU_X64) || defined(JS_CPU_MIPS)
     unsigned opLength() const { return opLength_; }
     bool isLoad() const { return loadedReg_ != UINT8_MAX; }

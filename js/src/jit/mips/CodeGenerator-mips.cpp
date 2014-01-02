@@ -2765,10 +2765,9 @@ DispatchIonCache::initializeAddCacheState(LInstruction *ins, AddCacheState *addS
 {
     // On x86, where there is no general purpose scratch register available,
     // child cache classes must manually specify a dispatch scratch register.
-    MOZ_ASSUME_UNREACHABLE("x86 needs manual assignment of dispatchScratch");
+    MOZ_ASSUME_UNREACHABLE("mips needs manual assignment of dispatchScratch");
 }
 
-#ifdef JS_CPU_X86
 void
 GetPropertyParIC::initializeAddCacheState(LInstruction *ins, AddCacheState *addState)
 {
@@ -2780,9 +2779,7 @@ GetPropertyParIC::initializeAddCacheState(LInstruction *ins, AddCacheState *addS
     else
         addState->dispatchScratch = ToRegister(ins->toGetPropertyCacheT()->temp());
 }
-#endif
 
-#ifdef JS_CPU_X86
 void
 GetElementParIC::initializeAddCacheState(LInstruction *ins, AddCacheState *addState)
 {
@@ -2794,9 +2791,7 @@ GetElementParIC::initializeAddCacheState(LInstruction *ins, AddCacheState *addSt
     else
         addState->dispatchScratch = ToRegister(ins->toGetElementCacheT()->temp());
 }
-#endif
 
-#ifdef JS_CPU_X86
 void
 SetPropertyParIC::initializeAddCacheState(LInstruction *ins, AddCacheState *addState)
 {
@@ -2807,9 +2802,7 @@ SetPropertyParIC::initializeAddCacheState(LInstruction *ins, AddCacheState *addS
     else
         addState->dispatchScratch = ToRegister(ins->toSetPropertyCacheT()->tempForDispatchCache());
 }
-#endif
 
-#ifdef JS_CPU_X86
 void
 SetElementParIC::initializeAddCacheState(LInstruction *ins, AddCacheState *addState)
 {
@@ -2821,7 +2814,6 @@ SetElementParIC::initializeAddCacheState(LInstruction *ins, AddCacheState *addSt
     else
         addState->dispatchScratch = ToRegister(ins->toSetElementCacheT()->temp());
 }
-#endif
 
 namespace js {
 namespace jit {

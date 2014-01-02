@@ -13,10 +13,6 @@
 using namespace js;
 using namespace js::jit;
 
-#if defined(_WIN32)
-# pragma pack(push, 1)
-#endif
-
 namespace js {
 namespace jit {
 
@@ -61,10 +57,6 @@ class BailoutStack
 
 } // namespace jit
 } // namespace js
-
-#if defined(_WIN32)
-# pragma pack(pop)
-#endif
 
 IonBailoutIterator::IonBailoutIterator(const JitActivationIterator &activations,
                                        BailoutStack *bailout)

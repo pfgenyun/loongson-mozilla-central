@@ -412,9 +412,10 @@ BaselineCompiler::emitOutOfLinePostBarrierSlot()
     Register objReg = R2.scratchReg();
     GeneralRegisterSet regs(GeneralRegisterSet::All());
     regs.take(objReg);
-    #ifndef (JS_CPU_MIPS)
-        regs.take(BaselineFrameReg);//author:huangwenjun date:2013-12-13
-    #endif
+#if defined(JS_CPU_X86) || defined(JS_CPU_X64) || defined(JS_CPU_ARM) 
+    regs.take(BaselineFrameReg);//author:huangwenjun date:2013-12-13
+#endif
+
     Register scratch = regs.takeAny();
 #if defined(JS_CPU_ARM)
     // On ARM, save the link register before calling.  It contains the return

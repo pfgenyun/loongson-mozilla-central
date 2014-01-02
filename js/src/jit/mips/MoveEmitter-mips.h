@@ -7,15 +7,7 @@
 #ifndef jit_mips_MoveEmitter_mips_h
 #define jit_mips_MoveEmitter_mips_h
 
-#if defined(JS_CPU_X86)
-# include "jit/x86/MacroAssembler-x86.h"
-#elif defined(JS_CPU_X64)
-# include "jit/x64/MacroAssembler-x64.h"
-#elif defined(JS_CPU_ARM)
-# include "jit/arm/MacroAssembler-arm.h"
-#elif defined(JS_CPU_MIPS)
-# include "jit/mips/MacroAssembler-mips.h"
-#endif
+#include "jit/mips/MacroAssembler-mips.h"
 #include "jit/MoveResolver.h"
 
 namespace js {

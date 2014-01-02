@@ -131,7 +131,7 @@ JitRuntime::generateEnterJIT(JSContext *cx, EnterJitType type)
         masm.subl(Imm32(8), t6);
 
         // Push what eax points to on stack, a Value is 2 words
-// Asse.. buf grow invalidates labels(256*4): JSC::AssemblerBuffer::grow(int) at ../../assembler/assembler/AssemblerBuffer.h:240
+        // Asse.. buf grow invalidates labels(256*4): JSC::AssemblerBuffer::grow(int) at ../../assembler/assembler/AssemblerBuffer.h:240
         masm.push(Operand(t6, 4));
         masm.push(Operand(t6, 0));
 
@@ -180,7 +180,6 @@ JitRuntime::generateEnterJIT(JSContext *cx, EnterJitType type)
        Register numStackValues = regs.takeAny();
        masm.movl(Operand(fp, ARG_STACKVALUES), numStackValues);
 
-       //masm.breakpoint();
        Register jitcode = regs.takeAny();
        masm.movl(Operand(fp, ARG_JITCODE), jitcode);
 
@@ -203,7 +202,6 @@ JitRuntime::generateEnterJIT(JSContext *cx, EnterJitType type)
        masm.addPtr(Imm32(BaselineFrame::Size() + BaselineFrame::FramePointerOffset), scratch);
        masm.makeFrameDescriptor(scratch, IonFrame_BaselineJS);
        masm.push(scratch);
-       //masm.breakpoint();
        masm.push(Imm32(0)); // Fake return address.
        masm.enterFakeExitFrame();
 
@@ -221,18 +219,15 @@ JitRuntime::generateEnterJIT(JSContext *cx, EnterJitType type)
 
        JS_ASSERT(jitcode != ReturnReg);
 
-       //masm.breakpoint();
        Label error;
        masm.addPtr(Imm32(IonExitFrameLayout::SizeWithFooter()), sp);
        masm.addPtr(Imm32(BaselineFrame::Size()), framePtr);
        masm.branchTest32(Assembler::Zero, ReturnReg, ReturnReg, &error);
-
+    
        //masm.breakpoint();
-
        masm.jump(jitcode); // error.
+       masm.breakpoint();
 
-       //masm.breakpoint();
-       
        // OOM: load error value, discard return address and previous frame
        // pointer and return.
        masm.bind(&error);
@@ -241,8 +236,6 @@ JitRuntime::generateEnterJIT(JSContext *cx, EnterJitType type)
        masm.moveValue(MagicValue(JS_ION_ERROR), JSReturnOperand);
        masm.mov(returnLabel.dest(), scratch);
        masm.jump(scratch);
-
-       //masm.breakpoint();
 
        masm.bind(&notOsr);
        masm.movl(Operand(fp, ARG_SCOPECHAIN), R1.scratchReg());
@@ -678,10 +671,6 @@ JitRuntime::generateVMWrapper(JSContext *cx, const VMFunction &f)
     masm.setupUnalignedABICall(f.argc(), regs.getAny());
     masm.passABIArg(cxreg);
 
-#if 0
-    masm.breakpoint();
-#endif
-
     size_t argDisp = 0;
 
     // Copy arguments.
@@ -691,35 +680,20 @@ JitRuntime::generateVMWrapper(JSContext *cx, const VMFunction &f)
             switch (f.argProperties(explicitArg)) {
               case VMFunction::WordByValue:
                 masm.passABIArg(MoveOperand(argsBase, argDisp));
-#if 0
-    masm.breakpoint();
-#endif
                 argDisp += sizeof(void *);
                 break;
               case VMFunction::DoubleByValue:
                 masm.passABIArg(MoveOperand(argsBase, argDisp));
-#if 0
-    masm.breakpoint();
-#endif
                 argDisp += sizeof(void *);
                 masm.passABIArg(MoveOperand(argsBase, argDisp));
-#if 0
-    masm.breakpoint();
-#endif
                 argDisp += sizeof(void *);
                 break;
               case VMFunction::WordByRef:
                 masm.passABIArg(MoveOperand(argsBase, argDisp, MoveOperand::EFFECTIVE));
-#if 0
-    masm.breakpoint();
-#endif
                 argDisp += sizeof(void *);
                 break;
               case VMFunction::DoubleByRef:
                 masm.passABIArg(MoveOperand(argsBase, argDisp, MoveOperand::EFFECTIVE));
-#if 0
-    masm.breakpoint();
-#endif
                 argDisp += 2 * sizeof(void *);
                 break;
             }

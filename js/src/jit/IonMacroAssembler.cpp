@@ -245,7 +245,7 @@ MacroAssembler::PushRegsInMask(RegisterSet set)
     int32_t diffF = set.fpus().size() * sizeof(double);
     int32_t diffG = set.gprs().size() * STACK_SLOT_SIZE;
 
-#if defined(JS_CPU_X86) || defined(JS_CPU_X64)
+#if defined(JS_CPU_X86) || defined(JS_CPU_X64) || defined(JS_CPU_MIPS)
     // On x86, always use push to push the integer registers, as it's fast
     // on modern hardware and it's a small instruction.
     for (GeneralRegisterBackwardIterator iter(set.gprs()); iter.more(); iter++) {
@@ -316,7 +316,7 @@ MacroAssembler::PopRegsInMaskIgnore(RegisterSet set, RegisterSet ignore)
     }
     JS_ASSERT(diffF == 0);
 
-#if defined(JS_CPU_X86) || defined(JS_CPU_X64)
+#if defined(JS_CPU_X86) || defined(JS_CPU_X64) || defined(JS_CPU_MIPS)
     // On x86, use pop to pop the integer registers, if we're not going to
     // ignore any slots, as it's fast on modern hardware and it's a small
     // instruction.
@@ -983,9 +983,9 @@ MacroAssembler::generateBailoutTail(Register scratch, Register bailoutInfo)
 #endif
             enterMonRegs.takeUnchecked(BaselineTailCallReg);
 
-//#ifdef JS_CPU_MIPS
-//            Register jitcodeReg = enterMonRegs.takeAny();   //author:huangwenjun date:2013-12-27
-//#endif
+#ifdef JS_CPU_MIPS
+            Register jitcodeReg = enterMonRegs.takeAny();   //author:huangwenjun date:2013-12-27
+#endif
 
             pop(BaselineStubReg);
             pop(BaselineTailCallReg);
@@ -999,11 +999,11 @@ MacroAssembler::generateBailoutTail(Register scratch, Register bailoutInfo)
             push(BaselineTailCallReg);
 #endif
             //author:huangwenjun date 2013-12-27
-//#ifdef JS_CPU_MIPS
-//            jump(jitcodeReg);
-//#else
+#ifdef JS_CPU_MIPS
+            jump(jitcodeReg);
+#else
             jump(Address(BaselineStubReg, ICStub::offsetOfStubCode()));
-//#endif
+#endif
         }
 
         //

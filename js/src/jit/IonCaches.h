@@ -1032,7 +1032,7 @@ class GetPropertyParIC : public ParallelIonCache
 
     CACHE_HEADER(GetPropertyPar)
 
-#ifdef JS_CPU_X86
+#if defined(JS_CPU_X86) || defined(JS_CPU_MIPS)
     // x86 lacks a general purpose scratch register for dispatch caches and
     // must be given one manually.
     void initializeAddCacheState(LInstruction *ins, AddCacheState *addState);
@@ -1089,7 +1089,7 @@ class GetElementParIC : public ParallelIonCache
 
     CACHE_HEADER(GetElementPar)
 
-#ifdef JS_CPU_X86
+#if defined(JS_CPU_X86) || defined(JS_CPU_MIPS)
     // x86 lacks a general purpose scratch register for dispatch caches and
     // must be given one manually.
     void initializeAddCacheState(LInstruction *ins, AddCacheState *addState);
@@ -1147,7 +1147,7 @@ class SetPropertyParIC : public ParallelIonCache
 
     CACHE_HEADER(SetPropertyPar)
 
-#ifdef JS_CPU_X86
+#if defined(JS_CPU_X86) || defined(JS_CPU_MIPS)
     // x86 lacks a general purpose scratch register for dispatch caches and
     // must be given one manually.
     void initializeAddCacheState(LInstruction *ins, AddCacheState *addState);
@@ -1207,7 +1207,7 @@ class SetElementParIC : public ParallelIonCache
 
     CACHE_HEADER(SetElementPar)
 
-#ifdef JS_CPU_X86
+#if defined(JS_CPU_X86) || defined(JS_CPU_MIPS)
     // x86 lacks a general purpose scratch register for dispatch caches and
     // must be given one manually.
     void initializeAddCacheState(LInstruction *ins, AddCacheState *addState);

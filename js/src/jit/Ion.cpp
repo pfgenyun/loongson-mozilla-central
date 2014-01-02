@@ -33,9 +33,9 @@
 #include "jit/LinearScan.h"
 #include "jit/LIR.h"
 #include "jit/Lowering.h"
-#if defined(JS_CPU_MIPS)
-# include "jit/mips/Lowering-mips.h"
-#endif
+//#if defined(JS_CPU_MIPS)
+//# include "jit/mips/Lowering-mips.h"
+//#endif
 #include "jit/ParallelSafetyAnalysis.h"
 #include "jit/PerfSpewer.h"
 #include "jit/RangeAnalysis.h"
