@@ -660,10 +660,9 @@ class Assembler
          * ori dest.code(), dest.code(), word.value & 0x0000ffff
          */
         CodeOffsetLabel label = CodeOffsetLabel(size());
-        lui(dest, word.value >> 16);
-        ori(dest, dest, word.value & 0x0000ffff);
+        lui(dest, (uint32_t)(word.value) >> 16);
+        ori(dest, dest, (uint32_t)(word.value) & 0x0000ffff);
         return label;
-
     }
     CodeOffsetLabel movWithPatch(const ImmPtr &imm, const Register &dest) {
         return movWithPatch(ImmWord(uintptr_t(imm.value)), dest);
@@ -3269,15 +3268,17 @@ class Assembler
          * lui reg, newData_hi
          * ori reg, reg, newData_low
          */
-        uint32_t *ptr = ((uintptr_t*) data.raw());
+        uint32_t *ptr = ((uint32_t*) data.raw());
         uint32_t luiIns = *ptr;
         uint32_t oriIns = *(ptr+1);
         JS_ASSERT((luiIns & 0xfc000000) == 0x3c000000); // whether is lui 
         JS_ASSERT((oriIns & 0xfc000000) == 0x34000000); // whether is ori 
         uint32_t oldData = ((luiIns & 0x0000ffff) << 16) | (oriIns & 0x0000ffff);
         JS_ASSERT(oldData == (uint32_t)expectedData.value);
-        *ptr = (luiIns & 0xffff0000) | ((*(int32_t *)(newData.value) & 0xffff0000) >> 16);
-        *(ptr+1) = (oriIns & 0xffff0000) | (*(int32_t *)(newData.value) & 0x0000ffff);
+        *ptr = (luiIns & 0xffff0000) | ((reinterpret_cast<uint32_t>(newData.value) & 0xffff0000) >> 16);
+        *(ptr+1) = (oriIns & 0xffff0000) | ((reinterpret_cast<uint32_t>(newData.value)) & 0x0000ffff);
+        //*ptr = (luiIns & 0xffff0000) | ((*((uint32_t *)(newData.value)) & 0xffff0000) >> 16);
+        //*(ptr+1) = (oriIns & 0xffff0000) | (*((uint32_t *)(newData.value)) & 0x0000ffff);
     }
     static void patchDataWithValueCheck(CodeLocationLabel data, ImmPtr newData, ImmPtr expectedData) {
         patchDataWithValueCheck(data, PatchedImmPtr(newData.value), PatchedImmPtr(expectedData.value));

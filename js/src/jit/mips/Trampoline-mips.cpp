@@ -226,7 +226,6 @@ JitRuntime::generateEnterJIT(JSContext *cx, EnterJitType type)
     
        //masm.breakpoint();
        masm.jump(jitcode); // error.
-       masm.breakpoint();
 
        // OOM: load error value, discard return address and previous frame
        // pointer and return.
