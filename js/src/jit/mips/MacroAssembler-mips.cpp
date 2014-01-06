@@ -473,7 +473,7 @@ MacroAssemblerMIPS::handleFailureWithHandlerTail()
     branch32(Assembler::Equal, t6, Imm32(ResumeFromException::RESUME_CATCH), &catch_);
     branch32(Assembler::Equal, t6, Imm32(ResumeFromException::RESUME_FINALLY), &finally);
     branch32(Assembler::Equal, t6, Imm32(ResumeFromException::RESUME_FORCED_RETURN), &return_);
-    //branch32(Assembler::Equal, t6, Imm32(ResumeFromException::RESUME_BAILOUT), &bailout);
+    branch32(Assembler::Equal, t6, Imm32(ResumeFromException::RESUME_BAILOUT), &bailout);
 
     breakpoint(); // Invalid kind.
 
@@ -516,14 +516,12 @@ MacroAssemblerMIPS::handleFailureWithHandlerTail()
     pop(fp);
     ret();
     
-    //author:huangwenjun date:2013-12-27 just for test
     // If we are bailing out to baseline to handle an exception, jump to
     // the bailout tail stub.
-    //bind(&bailout);
-    //loadPtr(Address(sp, offsetof(ResumeFromException, bailoutInfo)), t8);
-    //movl(Imm32(BAILOUT_RETURN_OK), t6);
-    //jmp(Operand(sp, offsetof(ResumeFromException, target)));
-
+    bind(&bailout);
+    loadPtr(Address(sp, offsetof(ResumeFromException, bailoutInfo)), t8);
+    movl(Imm32(BAILOUT_RETURN_OK), t6);
+    jmp(Operand(sp, offsetof(ResumeFromException, target)));
 }
 
 void
@@ -586,27 +584,7 @@ MacroAssemblerMIPS::testNegativeZeroFloat32(const FloatRegister &reg, const Regi
 
 void 
 MacroAssemblerMIPS::callIon(const Register &callee) {
-/*arm :
-    JS_ASSERT((framePushed() & 3) == 0);
-    if ((framePushed() & 7) == 4) {
-        ma_callIonHalfPush(callee);
-    } else {
-        adjustFrame(sizeof(void*));
-        ma_callIon(callee);
-    }
-*/
-//ok    call(callee);
     ma_callIonHalfPush(callee);//ok   //获取到当前的pc+7的值，存放至v0后压栈，然后成跳转至callee的跳转指令；
-#if 0 //try above line
-    JS_ASSERT((framePushed() & 3) == 0);
-    if ((framePushed() & 7) == 4) {
-        ma_callIonHalfPush(callee);//ok
-    } else {
-        //adjustFrame(sizeof(void*));
-        setFramePushed(framePushed_ + sizeof(void*));
-        ma_callIon(callee);//ok
-    }
-#endif
 }
 
 
@@ -618,7 +596,5 @@ MacroAssemblerMIPS::enterOsr(Register calleeToken, Register code) {
 //ok    //arm : ma_callIonHalfPush
 //ok    call(code);
     ma_callIonHalfPush(code);//获取到当前的pc+7，然后压栈，跳转至code处；
-#if ! defined (JS_CPU_MIPS)
     addl(Imm32(sizeof(uintptr_t) * 2), sp);
-#endif
 }
