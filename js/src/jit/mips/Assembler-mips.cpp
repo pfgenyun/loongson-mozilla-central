@@ -356,7 +356,7 @@ void
 Assembler::ma_call(const Register &reg) {
     if(reg != t9)
     {
-        move(t9,reg);
+        move(reg,t9);
     }
     jalr(t9);
     nop();

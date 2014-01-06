@@ -165,7 +165,7 @@ ICBinaryArith_Int32::Compiler::generateStubCode(MacroAssembler &masm)
         // Prevent negative 0 and -2147483648 % -1.
         masm.branchTest32(Assembler::Zero, R0.payloadReg(), Imm32(0x7fffffff), &failure);
 
-	masm.div(R0.payloadReg(), R1.payloadReg());
+		masm.div(R0.payloadReg(), R1.payloadReg());
 
         // Fail when we would need a negative remainder.
         Label done;

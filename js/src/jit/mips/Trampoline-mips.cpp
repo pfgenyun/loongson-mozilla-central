@@ -599,7 +599,6 @@ JitRuntime::generateBailoutHandler(JSContext *cx)
 IonCode *
 JitRuntime::generateVMWrapper(JSContext *cx, const VMFunction &f)
 {
-
     JS_ASSERT(!StackKeptAligned);
     JS_ASSERT(functionWrappers_);
     JS_ASSERT(functionWrappers_->initialized());
@@ -617,7 +616,6 @@ JitRuntime::generateVMWrapper(JSContext *cx, const VMFunction &f)
     // Wrapper register set is a superset of Volatile register set.
     JS_STATIC_ASSERT((Register::Codes::VolatileMask & ~Register::Codes::WrapperMask) == 0);
 
-    //author:huangwenjun date:2013-12-25
     // The context is the first argument.
     Register cxreg = regs.takeAny();
 
@@ -670,6 +668,7 @@ JitRuntime::generateVMWrapper(JSContext *cx, const VMFunction &f)
         JS_ASSERT(f.outParam == Type_Void);
         break;
     }
+
     masm.setupUnalignedABICall(f.argc(), regs.getAny());
     masm.passABIArg(cxreg);
 
@@ -710,14 +709,14 @@ JitRuntime::generateVMWrapper(JSContext *cx, const VMFunction &f)
 
     //author:huangwenjun date:2013-12-26
     // Test for failure.a
-    Label failure;
+    //Label failure;
     switch (f.failType()) {
       case Type_Object:
-        masm.branchTestPtr(Assembler::Zero, v0, v0, &failure);
+        masm.branchTestPtr(Assembler::Zero, v0, v0, masm.failureLabel(f.executionMode));
         break;
       case Type_Bool:
         masm.testb(v0, v0);
-        masm.j(Assembler::Zero, &failure);
+        masm.j(Assembler::Zero, masm.failureLabel(f.executionMode));
         break;
       default:
         MOZ_ASSUME_UNREACHABLE("unknown failure kind");
@@ -732,31 +731,30 @@ JitRuntime::generateVMWrapper(JSContext *cx, const VMFunction &f)
         break;
 
       case Type_Value:
-        masm.loadValue(Address(sp, 0), JSReturnOperand);
-        masm.freeStack(sizeof(Value));
-        //masm.Pop(JSReturnOperand);
+        //masm.loadValue(Address(sp, 0), JSReturnOperand);
+        //masm.freeStack(sizeof(Value));
+        masm.Pop(JSReturnOperand);
         break;
 
       case Type_Int32:
       case Type_Pointer:
-        masm.load32(Address(sp, 0), ReturnReg);
-        masm.freeStack(sizeof(int32_t));
-        //masm.Pop(ReturnReg);
+        //masm.load32(Address(sp, 0), ReturnReg);
+        //masm.freeStack(sizeof(int32_t));
+        masm.Pop(ReturnReg);
         break;
 
       case Type_Bool:
-        //masm.Pop(ReturnReg);
-        masm.load32(Address(sp, 0), ReturnReg);
-        masm.freeStack(sizeof(int32_t));
+        masm.Pop(ReturnReg);
+        //masm.load32(Address(sp, 0), ReturnReg);
+        //masm.freeStack(sizeof(int32_t));
         masm.movzbl(ReturnReg, ReturnReg);
         break;
 
       case Type_Double:
-        if (cx->runtime()->jitSupportsFloatingPoint) {
-            masm.load32(Address(sp, 0), ReturnReg);
-            masm.freeStack(sizeof(double));
-           //masm.Pop(ReturnFloatReg);
-        }
+        if (cx->runtime()->jitSupportsFloatingPoint) 
+            //masm.load32(Address(sp, 0), ReturnReg);
+            //masm.freeStack(sizeof(double));
+           masm.Pop(ReturnFloatReg);
         else
             masm.assumeUnreachable("Unable to pop to float reg, with no FP support.");
         break;
@@ -766,15 +764,14 @@ JitRuntime::generateVMWrapper(JSContext *cx, const VMFunction &f)
         break;
     }
     masm.leaveExitFrame();
-
     //author:huangwenjun date:2013-12-26
     masm.retn(Imm32(sizeof(IonExitFrameLayout) +
                     f.explicitStackSlots() * sizeof(void *) +
                     f.extraValuesToPop * sizeof(Value)));
     
     //now no 2014-1-3
-    masm.bind(&failure);    //2014-1-6
-    masm.handleFailure(f.executionMode);
+    //masm.bind(&failure);    //2014-1-6
+    //masm.handleFailure(f.executionMode);
     
     //masm.bind(&exception);
     //TODO, delete it or create function
