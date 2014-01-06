@@ -1591,7 +1591,8 @@ class MacroAssemblerMIPS : public Assembler
             mfc1(dest, js::jit::FloatRegister::FromCode(src.code() + 1));
             shrl(Imm32(0x1f), dest);
 
-            cmpl(zero, dest);
+            //cmpl(zero, dest);
+            cmpl(dest,zero);
             j(Assembler::NonZero, fail);
 
             bind(&notZero);
