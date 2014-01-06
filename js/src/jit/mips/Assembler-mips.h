@@ -2755,15 +2755,15 @@ class Assembler
     }
     void shrl_cl(const Register &dest) {
      //  masm.shrl_CLr(dest.code());
-         mcss.urshift32(mRegisterID(v0.code()), dest.code());
+         mcss.urshift32(mRegisterID(t8.code()), dest.code());
     }
     void shll_cl(const Register &dest) {
      //  masm.shll_CLr(dest.code());
-        mcss.lshift32(mRegisterID(v0.code()), dest.code());
+        mcss.lshift32(mRegisterID(t8.code()), dest.code());
     }
     void sarl_cl(const Register &dest) {
   //      masm.sarl_CLr(dest.code());
-      mcss.rshift32(mRegisterID(v0.code()), dest.code());
+      mcss.rshift32(mRegisterID(t8.code()), dest.code());
     }
 
     // New function

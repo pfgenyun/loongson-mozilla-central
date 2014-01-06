@@ -359,10 +359,12 @@ JitRuntime::generateInvalidator(JSContext *cx)
     masm.lea(Operand(sp, s1, TimesOne, sizeof(InvalidationBailoutStack)), sp);//caution FloatRegisters::Total
 
     // Jump to shared bailout tail. The BailoutInfo pointer has to be in ecx.
+    
+    //2013-1-3 author:huangwenjun
     //hwj: position difference
-    masm.generateBailoutTail(t7,t8);
-    //IonCode *bailoutTail = cx->runtime()->jitRuntime()->getBailoutTail();
-    //masm.jmp(bailoutTail);
+    //masm.generateBailoutTail(t7,t8);
+    IonCode *bailoutTail = cx->runtime()->jitRuntime()->getBailoutTail();
+    masm.jmp(bailoutTail);
 
     Linker linker(masm);
     IonCode *code = linker.newCode<NoGC>(cx, JSC::OTHER_CODE);
@@ -548,10 +550,11 @@ GenerateBailoutThunk(JSContext *cx, MacroAssembler &masm, uint32_t frameClass)
     }
     
     //author:huangwenjun date:2013-12-27 for test
-    masm.generateBailoutTail(t7,s1);
+    //2013-1-3
+    //masm.generateBailoutTail(t7,s1);
     // Jump to shared bailout tail. The BailoutInfo pointer has to be in ecx.
-    //IonCode *bailoutTail = cx->runtime()->jitRuntime()->getBailoutTail();
-    //masm.jmp(bailoutTail);
+    IonCode *bailoutTail = cx->runtime()->jitRuntime()->getBailoutTail();
+    masm.jmp(bailoutTail);
 }
 
 IonCode *
@@ -768,8 +771,11 @@ JitRuntime::generateVMWrapper(JSContext *cx, const VMFunction &f)
     masm.retn(Imm32(sizeof(IonExitFrameLayout) +
                     f.explicitStackSlots() * sizeof(void *) +
                     f.extraValuesToPop * sizeof(Value)));
-    masm.bind(&failure);
+    
+    //now no 2014-1-3
+    masm.bind(&failure);    //2014-1-6
     masm.handleFailure(f.executionMode);
+    
     //masm.bind(&exception);
     //TODO, delete it or create function
     //masm.handleException();
