@@ -1,8 +1,13 @@
-/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
- * vim: set ts=8 sts=4 et sw=4 tw=99:
+/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
+ * vim: set ts=4 sw=4 et tw=99:
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#include "MoveEmitter-mips.h"
+
+#include "jsscriptinlines.h"
 
 using namespace js;
 using namespace js::jit;
@@ -10,127 +15,24 @@ using namespace js::jit;
 MoveEmitterMIPS::MoveEmitterMIPS(MacroAssemblerSpecific &masm)
   : inCycle_(false),
     masm(masm),
-    pushedAtCycle_(-1)
+    pushedAtCycle_(-1),
+    pushedAtSpill_(-1),
+    spilledReg_(InvalidReg)
 {
     pushedAtStart_ = masm.framePushed();
-}
-
-// Examine the cycle in moves starting at position i. Determine if it's a
-// simple cycle consisting of all register-to-register moves in a single class,
-// and whether it can be implemented entirely by swaps.
-size_t
-MoveEmitterMIPS::characterizeCycle(const MoveResolver &moves, size_t i,
-                                  bool *allGeneralRegs, bool *allFloatRegs)
-{
-    size_t swapCount = 0;
-
-    for (size_t j = i; ; j++) {
-        const MoveOp &move = moves.getMove(j);
-
-        // If it isn't a cycle of registers of the same kind, we won't be able
-        // to optimize it.
-        if (!move.to().isGeneralReg())
-            *allGeneralRegs = false;
-        if (!move.to().isFloatReg())
-            *allFloatRegs = false;
-        if (!*allGeneralRegs && !*allFloatRegs)
-            return -1;
-
-        // The first and last move of the cycle are marked with inCycle(). Stop
-        // iterating when we see the last one.
-        if (j != i && move.inCycle())
-            break;
-
-        // Check that this move is actually part of the cycle. This is
-        // over-conservative when there are multiple reads from the same source,
-        // but that's expected to be rare.
-        if (move.from() != moves.getMove(j + 1).to()) {
-            *allGeneralRegs = false;
-            *allFloatRegs = false;
-            return -1;
-        }
-
-        swapCount++;
-    }
-
-    // Check that the last move cycles back to the first move.
-    const MoveOp &move = moves.getMove(i + swapCount);
-    if (move.from() != moves.getMove(i).to()) {
-        *allGeneralRegs = false;
-        *allFloatRegs = false;
-        return -1;
-    }
-
-    return swapCount;
-}
-
-// If we can emit optimized code for the cycle in moves starting at position i,
-// do so, and return true.
-bool
-MoveEmitterMIPS::maybeEmitOptimizedCycle(const MoveResolver &moves, size_t i,
-                                        bool allGeneralRegs, bool allFloatRegs, size_t swapCount)
-{
-    if (allGeneralRegs && swapCount <= 2) {
-        // Use mips's swap-integer-registers instruction if we only have a few
-        // swaps. (mips also has a swap between registers and memory but it's
-        // slow.)
-        for (size_t k = 0; k < swapCount; k++)
-            masm.xchg(moves.getMove(i + k).to().reg(), moves.getMove(i + k + 1).to().reg());
-        return true;
-    }
-
-    if (allFloatRegs && swapCount == 1) {
-        // There's no xchg for xmm registers, but if we only need a single swap,
-        // it's cheap to do an XOR swap.
-        FloatRegister a = moves.getMove(i).to().floatReg();
-        FloatRegister b = moves.getMove(i + 1).to().floatReg();
-        masm.xorpd(a, b);
-        masm.xorpd(b, a);
-        masm.xorpd(a, b);
-        return true;
-    }
-
-    return false;
 }
 
 void
 MoveEmitterMIPS::emit(const MoveResolver &moves)
 {
-    for (size_t i = 0; i < moves.numMoves(); i++) {
-        const MoveOp &move = moves.getMove(i);
-        const MoveOperand &from = move.from();
-        const MoveOperand &to = move.to();
-
-        if (move.inCycle()) {
-            // If this is the end of a cycle for which we're using the stack,
-            // handle the end.
-            if (inCycle_) {
-                completeCycle(to, move.kind());
-                inCycle_ = false;
-                continue;
-            }
-
-            // Characterize the cycle.
-            bool allGeneralRegs = true, allFloatRegs = true;
-            size_t swapCount = characterizeCycle(moves, i, &allGeneralRegs, &allFloatRegs);
-
-            // Attempt to optimize it to avoid using the stack.
-            if (maybeEmitOptimizedCycle(moves, i, allGeneralRegs, allFloatRegs, swapCount)) {
-                i += swapCount;
-                continue;
-            }
-
-            // Otherwise use the stack.
-            breakCycle(to, move.kind());
-            inCycle_ = true;
-        }
-
-        // A normal move which is not part of a cycle.
-        if (move.kind() == MoveOp::DOUBLE)
-            emitDoubleMove(from, to);
-        else
-            emitGeneralMove(from, to);
+    if (moves.hasCycles()) {
+        // Reserve stack for cycle resolution
+        masm.reserveStack(sizeof(double));
+        pushedAtCycle_ = masm.framePushed();
     }
+
+    for (size_t i = 0; i < moves.numMoves(); i++)
+        emit(moves.getMove(i));
 }
 
 MoveEmitterMIPS::~MoveEmitterMIPS()
@@ -138,61 +40,29 @@ MoveEmitterMIPS::~MoveEmitterMIPS()
     assertDone();
 }
 
-Address
-MoveEmitterMIPS::cycleSlot()
+Operand
+MoveEmitterMIPS::cycleSlot() const
 {
-    if (pushedAtCycle_ == -1) {
-        // Reserve stack for cycle resolution
-        masm.reserveStack(sizeof(double));
-        pushedAtCycle_ = masm.framePushed();
-    }
-
-    return Address(StackPointer, masm.framePushed() - pushedAtCycle_);
+    return Operand(StackPointer, masm.framePushed() - pushedAtCycle_);
 }
 
-Address
-MoveEmitterMIPS::toAddress(const MoveOperand &operand) const
+Operand
+MoveEmitterMIPS::spillSlot() const
 {
-    if (operand.base() != StackPointer)
-        return Address(operand.base(), operand.disp());
-
-    JS_ASSERT(operand.disp() >= 0);
-
-    // Otherwise, the stack offset may need to be adjusted.
-    return Address(StackPointer, operand.disp() + (masm.framePushed() - pushedAtStart_));
+    return Operand(StackPointer, masm.framePushed() - pushedAtSpill_);
 }
 
-// Warning, do not use the resulting operand with pop instructions, since they
-// compute the effective destination address after altering the stack pointer.
-// Use toPopOperand if an Operand is needed for a pop.
 Operand
 MoveEmitterMIPS::toOperand(const MoveOperand &operand) const
 {
-    if (operand.isMemory() || operand.isEffectiveAddress() || operand.isFloatAddress())
-        return Operand(toAddress(operand));
-    if (operand.isGeneralReg())
-        return Operand(operand.reg());
-
-    JS_ASSERT(operand.isFloatReg());
-    return Operand(operand.floatReg());
-}
-
-// This is the same as toOperand except that it computes an Operand suitable for
-// use in a pop.
-Operand
-MoveEmitterMIPS::toPopOperand(const MoveOperand &operand) const
-{
-    if (operand.isMemory()) {
+    if (operand.isMemory() || operand.isEffectiveAddress() || operand.isFloatAddress()) {
         if (operand.base() != StackPointer)
             return Operand(operand.base(), operand.disp());
 
         JS_ASSERT(operand.disp() >= 0);
 
         // Otherwise, the stack offset may need to be adjusted.
-        // Note the adjustment by the stack slot here, to offset for the fact that pop
-        // computes its effective address after incrementing the stack pointer.
-        return Operand(StackPointer,
-                       operand.disp() + (masm.framePushed() - sizeof(void *) - pushedAtStart_));
+        return Operand(StackPointer, operand.disp() + (masm.framePushed() - pushedAtStart_));
     }
     if (operand.isGeneralReg())
         return Operand(operand.reg());
@@ -201,8 +71,27 @@ MoveEmitterMIPS::toPopOperand(const MoveOperand &operand) const
     return Operand(operand.floatReg());
 }
 
+Register
+MoveEmitterMIPS::tempReg()
+{
+    if (spilledReg_ != InvalidReg)
+        return spilledReg_;
+
+    // For now, just pick edx/rdx as the eviction point. This is totally
+    // random, and if it ends up being bad, we can use actual heuristics later.
+    spilledReg_ = t6;  // by wangqing
+
+    if (pushedAtSpill_ == -1) {
+        masm.Push(spilledReg_);
+        pushedAtSpill_ = masm.framePushed();
+    } else {
+        masm.mov(spilledReg_, spillSlot());
+    }
+    return spilledReg_;
+}
+
 void
-MoveEmitterMIPS::breakCycle(const MoveOperand &to, MoveOp::Kind kind)
+MoveEmitterMIPS::breakCycle(const MoveOperand &from, const MoveOperand &to, MoveOp::Kind kind)
 {
     // There is some pattern:
     //   (A -> B)
@@ -212,18 +101,29 @@ MoveEmitterMIPS::breakCycle(const MoveOperand &to, MoveOp::Kind kind)
     // the original move to continue.
     if (kind == MoveOp::DOUBLE) {
         if (to.isMemory()) {
-            masm.loadDouble(toAddress(to), ScratchFloatReg);
-            masm.storeDouble(ScratchFloatReg, cycleSlot());
+            masm.movsd(toOperand(to), ScratchFloatReg);
+            masm.movsd(ScratchFloatReg, cycleSlot());
         } else {
-            masm.storeDouble(to.floatReg(), cycleSlot());
+            masm.movsd(to.floatReg(), cycleSlot());
         }
     } else {
-        masm.Push(toOperand(to));
+        if (to.isMemory()) {
+            Register temp = tempReg();
+            masm.mov(toOperand(to), temp);
+            masm.mov(temp, cycleSlot());
+        } else {
+            if (to.reg() == spilledReg_) {
+                // If the destination was spilled, restore it first.
+                masm.mov(spillSlot(), spilledReg_);
+                spilledReg_ = InvalidReg;
+            }
+            masm.mov(to.reg(), cycleSlot());
+        }
     }
 }
 
 void
-MoveEmitterMIPS::completeCycle(const MoveOperand &to, MoveOp::Kind kind)
+MoveEmitterMIPS::completeCycle(const MoveOperand &from, const MoveOperand &to, MoveOp::Kind kind)
 {
     // There is some pattern:
     //   (A -> B)
@@ -233,48 +133,65 @@ MoveEmitterMIPS::completeCycle(const MoveOperand &to, MoveOp::Kind kind)
     // saved value of B, to A.
     if (kind == MoveOp::DOUBLE) {
         if (to.isMemory()) {
-            masm.loadDouble(cycleSlot(), ScratchFloatReg);
-            masm.storeDouble(ScratchFloatReg, toAddress(to));
+            masm.movsd(cycleSlot(), ScratchFloatReg);
+            masm.movsd(ScratchFloatReg, toOperand(to));
         } else {
-            masm.loadDouble(cycleSlot(), to.floatReg());
+            masm.movsd(cycleSlot(), to.floatReg());
         }
     } else {
         if (to.isMemory()) {
-            masm.Pop(toPopOperand(to));
+            Register temp = tempReg();
+            masm.mov(cycleSlot(), temp);
+            masm.mov(temp, toOperand(to));
         } else {
-            masm.Pop(to.reg());
+            if (to.reg() == spilledReg_) {
+                // Make sure we don't re-clobber the spilled register later.
+                spilledReg_ = InvalidReg;
+            }
+            masm.mov(cycleSlot(), to.reg());
         }
     }
 }
 
 void
-MoveEmitterMIPS::emitGeneralMove(const MoveOperand &from, const MoveOperand &to)
+MoveEmitterMIPS::emitMove(const MoveOperand &from, const MoveOperand &to)
 {
+    if (to.isGeneralReg() && to.reg() == spilledReg_) {
+        // If the destination is the spilled register, make sure we
+        // don't re-clobber its value.
+        spilledReg_ = InvalidReg;
+    }
+
     if (from.isGeneralReg()) {
+        if (from.reg() == spilledReg_) {
+            // If the source is a register that has been spilled, make sure
+            // to load the source back into that register.
+            masm.mov(spillSlot(), spilledReg_);
+            spilledReg_ = InvalidReg;
+        }
         masm.mov(from.reg(), toOperand(to));
-    } else if (from.isFloatReg() && to.isGeneralReg()) {
+    } else if (from.isFloatReg() && to.isGeneralReg()) { //by weizhenwei, 2013.11.13
         masm.mfc1(to.reg(), from.floatReg());
     } else if (to.isGeneralReg()) {
         JS_ASSERT(from.isMemory() || from.isEffectiveAddress());
         if (from.isMemory())
-            masm.loadPtr(toAddress(from), to.reg());
+            masm.mov(toOperand(from), to.reg());
         else
             masm.lea(toOperand(from), to.reg());
-    } else if (from.isMemory()) {
-        // Memory to memory gpr move.
-        // No ScratchReg; bounce it off the stack.
-        masm.Push(toOperand(from));
-        masm.Pop(toPopOperand(to));
     } else {
-        // Effective address to memory move.
-        JS_ASSERT(from.isEffectiveAddress());
+        // Memory to memory gpr move.
+        Register reg = tempReg();
+        // Reload its previous value from the stack.
+        if (reg == from.base())
+            masm.mov(spillSlot(), from.base());
 
-        // This is tricky without a ScratchReg. We can't do an lea. Bounce the
-        // base register off the stack, then add the offset in place. Note that
-        // this clobbers FLAGS!
-        masm.Push(from.base());
-        masm.Pop(toPopOperand(to));
-        masm.addPtr(Imm32(from.disp()), toOperand(to));
+        JS_ASSERT(from.isMemory() || from.isEffectiveAddress());
+        if (from.isMemory())
+            masm.mov(toOperand(from), reg);
+        else
+            masm.lea(toOperand(from), reg);
+        JS_ASSERT(to.base() != reg);
+        masm.mov(reg, toOperand(to));
     }
 }
 
@@ -282,18 +199,38 @@ void
 MoveEmitterMIPS::emitDoubleMove(const MoveOperand &from, const MoveOperand &to)
 {
     if (from.isFloatReg()) {
-        if (to.isFloatReg())
-            masm.moveDouble(from.floatReg(), to.floatReg());
-        else
-            masm.storeDouble(from.floatReg(), toAddress(to));
+        masm.movsd(from.floatReg(), toOperand(to));
     } else if (to.isFloatReg()) {
-        masm.loadDouble(toAddress(from), to.floatReg());
+        masm.movsd(toOperand(from), to.floatReg());
     } else {
         // Memory to memory float move.
         JS_ASSERT(from.isMemory());
-        masm.loadDouble(toAddress(from), ScratchFloatReg);
-        masm.storeDouble(ScratchFloatReg, toAddress(to));
+        masm.movsd(toOperand(from), ScratchFloatReg);
+        masm.movsd(ScratchFloatReg, toOperand(to));
     }
+}
+
+void
+MoveEmitterMIPS::emit(const MoveOp &move)
+{
+    const MoveOperand &from = move.from();
+    const MoveOperand &to = move.to();
+
+    if (move.inCycle()) {
+        if (inCycle_) {
+            completeCycle(from, to, move.kind());
+            inCycle_ = false;
+            return;
+        }
+
+        breakCycle(from, to, move.kind());
+        inCycle_ = true;
+    }
+    
+    if (move.kind() == MoveOp::DOUBLE)
+        emitDoubleMove(from, to);
+    else
+        emitMove(from, to);
 }
 
 void
@@ -306,6 +243,9 @@ void
 MoveEmitterMIPS::finish()
 {
     assertDone();
+
+    if (pushedAtSpill_ != -1 && spilledReg_ != InvalidReg)
+        masm.mov(spillSlot(), spilledReg_);
 
     masm.freeStack(masm.framePushed() - pushedAtStart_);
 }
