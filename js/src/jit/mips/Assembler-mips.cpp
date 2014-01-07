@@ -242,6 +242,12 @@ Assembler::zerod(const FloatRegister &src) {
     mcss.zeroDouble(mFPRegisterID(src.code()));
 }
 
+// add by wangqing, 2014-01-07
+void
+Assembler::zeros(const FloatRegister &src) {
+    mcss.zeroFloat(mFPRegisterID(src.code()));
+}
+
 //author:huangwenjun date:2013-12-23
 void
 Assembler::retn(Imm32 n) {

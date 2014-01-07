@@ -2965,6 +2965,13 @@ public:
         m_assembler.mtc1(MIPSRegisters::zero, FPRegisterID(dest + 1));
 #endif
     }
+	
+	// add by wangqing, 2014-01-07
+	void zeroFloat(FPRegisterID dest)
+    {
+        m_assembler.mtc1(MIPSRegisters::zero, dest);
+    }
+
 
     //ion helper
     void truncateDoubleToInt32(FPRegisterID src, RegisterID dest)

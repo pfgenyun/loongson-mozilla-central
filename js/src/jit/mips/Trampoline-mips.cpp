@@ -19,6 +19,7 @@
 #endif                        
 #include "jit/Bailouts.h"
 #include "jit/VMFunctions.h"
+#include "jit/MoveResolver.h"
 #include "jit/mips/BaselineHelpers-mips.h"
 
 #include "jsscriptinlines.h"
@@ -599,6 +600,8 @@ JitRuntime::generateBailoutHandler(JSContext *cx)
 IonCode *
 JitRuntime::generateVMWrapper(JSContext *cx, const VMFunction &f)
 {
+	typedef MoveOperand MoveOperand;
+
     JS_ASSERT(!StackKeptAligned);
     JS_ASSERT(functionWrappers_);
     JS_ASSERT(functionWrappers_->initialized());
@@ -684,6 +687,8 @@ JitRuntime::generateVMWrapper(JSContext *cx, const VMFunction &f)
                 argDisp += sizeof(void *);
                 break;
               case VMFunction::DoubleByValue:
+                // We don't pass doubles in float registers on x86, so no need
+                // to check for argPassedInFloatReg.
                 masm.passABIArg(MoveOperand(argsBase, argDisp));
                 argDisp += sizeof(void *);
                 masm.passABIArg(MoveOperand(argsBase, argDisp));
@@ -815,8 +820,8 @@ JitRuntime::generatePreBarrier(JSContext *cx, MIRType type){
     masm.setupUnalignedABICall(2, t6);
     masm.passABIArg(t8);
     masm.passABIArg(t7);
-//NOTE*:this is update in ff24
-  //  masm.callWithABI(JS_FUNC_TO_DATA_PTR(void *, MarkFromIon));
+	//NOTE*:this is update in ff24
+  	//  masm.callWithABI(JS_FUNC_TO_DATA_PTR(void *, MarkFromIon));
    if (type == MIRType_Value) {
         masm.callWithABI(JS_FUNC_TO_DATA_PTR(void *, MarkValueFromIon));
     } else {

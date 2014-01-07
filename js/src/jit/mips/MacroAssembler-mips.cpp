@@ -104,12 +104,12 @@ MacroAssemblerMIPS::loadConstantFloat32(float f, const FloatRegister &dest)
     if (!flt)
         return;
 //    masm.movss_mr(reinterpret_cast<const void *>(flt->uses.prev()), dest.code());
-   mcss.loadFloat(reinterpret_cast<void *>(flt->uses.prev()), dest.code());
+   	mcss.loadFloat(reinterpret_cast<void *>(flt->uses.prev()), dest.code());
     //flt->uses.setPrev(masm.size());
     //author:huangwenjun date:2013-12-23
     //flt->uses.setPrev(masm.size());
     mov(&(flt->uses), addrTempRegister);
-    ldc1(dest,addrTempRegister,ImmWord((uintptr_t)((void*)0)));
+    lwc1(dest,addrTempRegister,ImmWord((uintptr_t)((void*)0)));
 }
 
 void
@@ -119,12 +119,12 @@ MacroAssemblerMIPS::addConstantFloat32(float f, const FloatRegister &dest)
     if (!flt)
         return;
 //    masm.addss_mr(reinterpret_cast<const void *>(flt->uses.prev()), dest.code()); // need to modify. by wangqing
-    mcss.loadFloat(reinterpret_cast<const void *>(flt->uses.prev()), dest.code()); 
+    mcss.addFloat(reinterpret_cast<const void *>(flt->uses.prev()), dest.code()); 
     //flt->uses.setPrev(masm.size());
     //author:huangwenjun date:2013-12-23
     //flt->uses.setPrev(masm.size());
     mov(&(flt->uses), addrTempRegister);
-    ldc1(dest,addrTempRegister,ImmWord((uintptr_t)((void*)0)));
+    lwc1(dest,addrTempRegister,ImmWord((uintptr_t)((void*)0)));
 }
 
 void

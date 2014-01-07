@@ -3171,7 +3171,7 @@ class Assembler
         //masm.xorps_rr(src.code(), dest.code());
         // fix me: by wangqing
         ASSERT(src.code() == dest.code());
-        zerod(src);
+        zeros(src);
     }
 
     void orpd(const FloatRegister &src, const FloatRegister &dest) {
