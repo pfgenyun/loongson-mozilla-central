@@ -4,8 +4,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#ifndef jsion_architecture_mips_h
-#define jsion_architecture_mips_h
+#ifndef jit_architecture_mips_h
+#define jit_architecture_mips_h
 
 #include "assembler/assembler/MacroAssembler.h"
 
@@ -209,4 +209,4 @@ class FloatRegisters {
 } // namespace jit
 } // namespace js
 
-#endif // jsion_architecture_mips_h
+#endif // jit_architecture_mips_h

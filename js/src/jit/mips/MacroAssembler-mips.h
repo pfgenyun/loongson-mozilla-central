@@ -1626,13 +1626,13 @@ class MacroAssemblerMIPS : public Assembler
                 // bits 1 to 3 = signs of higher floats
                 //movmskps(src, dest);
                 //andl(Imm32(1), dest);
-                // move double's high 32 to dest and get its sign bit
-                // TODO: check whether float and double are same, weizhenwei, 2013.12.26
-                mfc1(dest, js::jit::FloatRegister::FromCode(src.code() + 1));
-                shrl(Imm32(0x1f), dest);
+            // move double's high 32 to dest and get its sign bit
+            // TODO: check whether float and double are same, weizhenwei, 2013.12.26
+            mfc1(dest, js::jit::FloatRegister::FromCode(src.code() + 1));
+            shrl(Imm32(0x1f), dest);
 
-                cmpl(zero, dest);
-                j(Assembler::NonZero, fail);
+            cmpl(zero, dest);
+            j(Assembler::NonZero, fail);
 //            }
 
             bind(&notZero);
@@ -1784,4 +1784,4 @@ typedef MacroAssemblerMIPS MacroAssemblerSpecific;
 } // namespace jit
 } // namespace js
 
-#endif /* jit_shared_MacroAssembler_mips_shared_h */
+#endif /* jit_mips_MacroAssembler_mips_h */
