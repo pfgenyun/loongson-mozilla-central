@@ -166,6 +166,7 @@ CodeGeneratorMIPS::emitSet(Assembler::DoubleCondition cond, const FloatRegister 
         if (ifNaN != Assembler::NaN_HandledByCond) {
             Label noNaN;
            //j(Assembler::NoParity, &noNaN);
+           JS_ASSERT(0);
            masm.branchDouble(Assembler::DoubleOrdered, lhs, rhs, &noNaN);
             if (ifNaN == Assembler::NaN_IsTrue)
                 masm.movl(Imm32(1), dest);
@@ -179,6 +180,7 @@ CodeGeneratorMIPS::emitSet(Assembler::DoubleCondition cond, const FloatRegister 
 
         if (ifNaN == Assembler::NaN_IsFalse) {
             //j(Assembler::Parity, &ifFalse);
+            JS_ASSERT(0);
             masm.branchDouble(Assembler::DoubleUnordered, lhs, rhs, &ifFalse);
         }
         masm.movl(Imm32(1), dest);
@@ -186,7 +188,8 @@ CodeGeneratorMIPS::emitSet(Assembler::DoubleCondition cond, const FloatRegister 
         masm.branchDouble(cond, lhs, rhs, &end);
         if (ifNaN == Assembler::NaN_IsTrue) {
            //j(Assembler::Parity, &end);
-            masm.branchDouble(Assembler::DoubleUnordered, lhs, rhs, &end);
+           JS_ASSERT(0);
+           masm.branchDouble(Assembler::DoubleUnordered, lhs, rhs, &end);
         }
           
         masm.bind(&ifFalse);
@@ -1915,7 +1918,7 @@ CodeGeneratorMIPS::visitRound(LRound *lir)
     masm.addsd(input, temp);
 
     masm.cvttsd2si(temp, output);
-    masm.cmp32(output, Imm32(INT_MIN));
+    masm.cmp32(output, Imm32(0x7fffffff)); // by wangqing, 2013-11-19
     if (!bailoutIf(Assembler::Equal, lir->snapshot()))
         return false;
 
@@ -1933,7 +1936,7 @@ CodeGeneratorMIPS::visitRound(LRound *lir)
             // Truncate and round toward zero.
             // This is off-by-one for everything but integer-valued inputs.
             masm.cvttsd2si(temp, output);
-            masm.cmp32(output, Imm32(INT_MIN));
+            masm.cmp32(output, Imm32(0x7fffffff)); // by wangqing, 2013-11-19
             if (!bailoutIf(Assembler::Equal, lir->snapshot()))
                 return false;
 
@@ -1951,6 +1954,10 @@ CodeGeneratorMIPS::visitRound(LRound *lir)
 
         masm.bind(&testZero);
         if (!bailoutIf(Assembler::Zero, lir->snapshot()))
+            return false;
+
+        //add NaN check and Bailout, by weizhenwei, 2013.11.19
+        if (!bailoutIf(Assembler::Parity, lir->snapshot()))
             return false;
 
     masm.bind(&end);
@@ -2037,6 +2044,7 @@ CodeGeneratorMIPS::generateInvalidateEpilogue()
     // We should never reach this point in JIT code -- the invalidation thunk should
     // pop the invalidated JS frame and return directly to its caller.
     //masm.assumeUnreachable("Should have returned directly to its caller instead of here.");
+    masm.breakpoint();
     return true;
 }
 
