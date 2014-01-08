@@ -20,6 +20,10 @@
 # include "jit/mips/Architecture-mips.h"
 #endif
 
+#if !defined(JS_CPU_ARM) && !defined(JS_CPU_MIPS) && defined(JS_METHODJIT)
+#include "assembler/assembler/MacroAssembler.h"
+#endif
+
 namespace js {
 namespace jit {
 

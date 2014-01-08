@@ -217,14 +217,9 @@ CodeGeneratorMIPS::visitTestIAndBranch(LTestIAndBranch *test)
 {
     const LAllocation *opd = test->input();
 
-    // Test the operand
-//    masm.testl(ToRegister(opd), ToRegister(opd));
-//    emitBranch(Assembler::NonZero, test->ifTrue(), test->ifFalse());
-    //by weizhenwei, 2013.11.05
-    //masm.xorpd(ScratchFloatReg, ScratchFloatReg);
-    masm.zerod(ScratchFloatReg);
-    emitBranch(masm.DoubleConditionFromCondition(Assembler::NotEqual), 
-               ToFloatRegister(opd), ScratchFloatReg,  test->ifTrue(), test->ifFalse());
+	// Test the operand
+	masm.cmpl(ToRegister(opd), zero);
+	emitBranch(Assembler::NonZero, test->ifTrue(), test->ifFalse());
 
     return true;
 }
