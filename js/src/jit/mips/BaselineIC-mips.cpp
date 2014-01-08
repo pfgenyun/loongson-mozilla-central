@@ -251,7 +251,7 @@ ICBinaryArith_Int32::Compiler::generateStubCode(MacroAssembler &masm)
         masm.movl(R0.payloadReg(), scratchReg);
         masm.orl(R1.payloadReg(), scratchReg);
         //add by QuQiuwen;
-        masm.cmpl(scratchReg,zero);
+        masm.cmpl(scratchReg, zero);
         masm.j(Assembler::Signed, &failure);
 
         // Result is +0.

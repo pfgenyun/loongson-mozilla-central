@@ -2907,13 +2907,13 @@ CodeGeneratorMIPS::visitOutOfLineTruncate(OutOfLineTruncate *ool)
         //masm.ucomisd(input, ScratchFloatReg);
         //masm.j(Assembler::Parity, &fail);
         //by weizhenwei, 2013.11.05
-        masm.zerod(ScratchFloatReg);
-        masm.branchDouble(masm.DoubleConditionFromCondition(Assembler::Parity),
-                                         input, ScratchFloatReg, &fail);
+		masm.zerod(ScratchFloatReg);                                          
+		masm.branchDouble(Assembler::DoubleUnordered, input, ScratchFloatReg, &fail);
 
         {
             Label positive;
-            masm.j(Assembler::Above, &positive);
+            //masm.j(Assembler::Above, &positive);
+			masm.branchDouble(Assembler::DoubleGreaterThan, input, ScratchFloatReg, &positive);
 
             masm.loadConstantDouble(4294967296.0, temp);
             Label skip;
@@ -2932,10 +2932,8 @@ CodeGeneratorMIPS::visitOutOfLineTruncate(OutOfLineTruncate *ool)
         //masm.j(Assembler::Parity, &fail);
         //masm.j(Assembler::Equal, ool->rejoin());
         //by weizhenwei, 2013.11.05
-        masm.branchDouble(masm.DoubleConditionFromCondition(Assembler::Parity),
-                                               temp, ScratchFloatReg, &fail);
-        masm.branchDouble(masm.DoubleConditionFromCondition(Assembler::Equal),
-                                               temp, ScratchFloatReg, ool->rejoin());
+		masm.branchDouble(Assembler::DoubleUnordered, temp, ScratchFloatReg, &fail);
+		masm.branchDouble(Assembler::DoubleEqual, temp, ScratchFloatReg, ool->rejoin());
     }
 
     masm.bind(&fail);
@@ -2965,49 +2963,23 @@ CodeGeneratorMIPS::visitOutOfLineTruncateFloat32(OutOfLineTruncateFloat32 *ool)
     Register output = ToRegister(ins->output());
 
     Label fail;
-
-    /*if (Assembler::HasSSE3()) {
-        // Push float32, but subtracts 64 bits so that the value popped by fisttp fits
-        masm.subl(Imm32(sizeof(uint64_t)), esp);
-        masm.storeFloat(input, Operand(esp, 0));
-
-        static const uint32_t EXPONENT_MASK = FloatExponentBits;
-        static const uint32_t EXPONENT_SHIFT = FloatExponentShift;
-        // Integers are still 64 bits long, so we can still test for an exponent > 63.
-        static const uint32_t TOO_BIG_EXPONENT = (FloatExponentBias + 63) << EXPONENT_SHIFT;
-
-        // Check exponent to avoid fp exceptions.
-        Label failPopFloat;
-        masm.movl(Operand(esp, 0), output);
-        masm.and32(Imm32(EXPONENT_MASK), output);
-        masm.branch32(Assembler::GreaterThanOrEqual, output, Imm32(TOO_BIG_EXPONENT), &failPopFloat);
-
-        // Load float, perform 32-bit truncation.
-        masm.fld32(Operand(esp, 0));
-        masm.fisttp(Operand(esp, 0));
-
-        // Load low word, pop 64bits and jump back.
-        masm.movl(Operand(esp, 0), output);
-        masm.addl(Imm32(sizeof(uint64_t)), esp);
-        masm.jump(ool->rejoin());
-
-        masm.bind(&failPopFloat);
-        masm.addl(Imm32(sizeof(uint64_t)), esp);
-        masm.jump(&fail);
-    } else */{
+	{
         FloatRegister temp = ToFloatRegister(ins->tempFloat());
 
         // Try to convert float32 representing integers within 2^32 of a signed
         // integer, by adding/subtracting 2^32 and then trying to convert to int32.
         // This has to be an exact conversion, as otherwise the truncation works
         // incorrectly on the modified value.
-        masm.xorps(ScratchFloatReg, ScratchFloatReg);
-        masm.ucomiss(input, ScratchFloatReg);
-        masm.j(Assembler::Parity, &fail);
+        //masm.xorps(ScratchFloatReg, ScratchFloatReg);
+        //masm.ucomiss(input, ScratchFloatReg);
+        //masm.j(Assembler::Parity, &fail);
+		masm.zeros(ScratchFloatReg);                                          
+		masm.branchDouble(Assembler::DoubleUnordered, input, ScratchFloatReg, &fail);
 
         {
             Label positive;
-            masm.j(Assembler::Above, &positive);
+            //masm.j(Assembler::Above, &positive);
+			masm.branchDouble(Assembler::DoubleGreaterThan, input, ScratchFloatReg, &positive);
 
             masm.loadConstantFloat32(4294967296.f, temp);
             Label skip;
@@ -3022,9 +2994,11 @@ CodeGeneratorMIPS::visitOutOfLineTruncateFloat32(OutOfLineTruncateFloat32 *ool)
         masm.cvttss2si(temp, output);
         masm.cvtsi2ss(output, ScratchFloatReg);
 
-        masm.ucomiss(temp, ScratchFloatReg);
-        masm.j(Assembler::Parity, &fail);
-        masm.j(Assembler::Equal, ool->rejoin());
+        //masm.ucomiss(temp, ScratchFloatReg);
+        //masm.j(Assembler::Parity, &fail);
+        //masm.j(Assembler::Equal, ool->rejoin());
+		masm.branchDouble(Assembler::DoubleUnordered, temp, ScratchFloatReg, &fail);
+		masm.branchDouble(Assembler::DoubleEqual, temp, ScratchFloatReg, ool->rejoin());
     }
 
     masm.bind(&fail);
