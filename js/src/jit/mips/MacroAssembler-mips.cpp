@@ -48,13 +48,11 @@ MacroAssemblerMIPS::loadConstantDouble(double d, const FloatRegister &dest)
     Double *dbl = getDouble(d);
     if (!dbl)
         return;
-//    masm.movsd_mr(reinterpret_cast<const void *>(dbl->uses.prev()), dest.code());
-    mcss.loadDouble(reinterpret_cast<const void *>(dbl->uses.prev()), dest.code());
  
     //author:huangwenjun date:2013-12-23
     //dbl->uses.setPrev(masm.size());
     mov(&(dbl->uses), addrTempRegister);
-    ldc1(dest,addrTempRegister,ImmWord((uintptr_t)((void*)0)));
+    ldc1(dest, addrTempRegister, ImmWord((uintptr_t)((void*)0)));
 }
 
 void
@@ -64,11 +62,11 @@ MacroAssemblerMIPS::addConstantDouble(double d, const FloatRegister &dest)
     if (!dbl)
         return;
 //    masm.addsd_mr(reinterpret_cast<const void *>(dbl->uses.prev()), dest.code()); 
-    mcss.addDouble(reinterpret_cast<const void *>(dbl->uses.prev()), dest.code()); 
+    //mcss.addDouble(reinterpret_cast<const void *>(dbl->uses.prev()), dest.code()); 
     //author:huangwenjun date:2013-12-23
     //dbl->uses.setPrev(masm.size());
     mov(&(dbl->uses), addrTempRegister);
-    ldc1(dest,addrTempRegister,ImmWord((uintptr_t)((void*)0)));
+    ldc1(dest, addrTempRegister, ImmWord((uintptr_t)((void*)0)));
 }
 
 MacroAssemblerMIPS::Float *
@@ -104,7 +102,7 @@ MacroAssemblerMIPS::loadConstantFloat32(float f, const FloatRegister &dest)
     if (!flt)
         return;
 //    masm.movss_mr(reinterpret_cast<const void *>(flt->uses.prev()), dest.code());
-   	mcss.loadFloat(reinterpret_cast<void *>(flt->uses.prev()), dest.code());
+   //	mcss.loadFloat(reinterpret_cast<void *>(flt->uses.prev()), dest.code());
     //flt->uses.setPrev(masm.size());
     //author:huangwenjun date:2013-12-23
     //flt->uses.setPrev(masm.size());
@@ -119,7 +117,7 @@ MacroAssemblerMIPS::addConstantFloat32(float f, const FloatRegister &dest)
     if (!flt)
         return;
 //    masm.addss_mr(reinterpret_cast<const void *>(flt->uses.prev()), dest.code()); // need to modify. by wangqing
-    mcss.addFloat(reinterpret_cast<const void *>(flt->uses.prev()), dest.code()); 
+    //mcss.addFloat(reinterpret_cast<const void *>(flt->uses.prev()), dest.code()); 
     //flt->uses.setPrev(masm.size());
     //author:huangwenjun date:2013-12-23
     //flt->uses.setPrev(masm.size());
