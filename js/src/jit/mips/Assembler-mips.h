@@ -1684,23 +1684,15 @@ class Assembler
         movl(addrTempRegister, dest);
     }
 
-    // Eventually movapd and movaps should be overloaded to support loads and
-    // stores too.
-    // New function
-    void movapd(const FloatRegister &src, const FloatRegister &dest) {
-        JS_ASSERT(0);
-        //JS_ASSERT(HasSSE2());
-        //masm.movapd_rr(src.code(), dest.code());
-    }
     void movsd(const FloatRegister &src, const FloatRegister &dest) {
 //ok        masm.movsd_rr(src.code(), dest.code());
             mcss.moveDouble(src.code(), dest.code());
     }
-    // New function
-    void movaps(const FloatRegister &src, const FloatRegister &dest) {
-        JS_ASSERT(0);
-//        JS_ASSERT(HasSSE2());
-//        masm.movaps_rr(src.code(), dest.code());
+    
+    // by wangqing, 2014-01-10
+    void movss(const FloatRegister &src, const FloatRegister &dest) {
+//ok        masm.movss_rr(src.code(), dest.code());
+            mcss.moveFloat(src.code(), dest.code());
     }
 
     // movsd and movss are only provided in load/store form since the
@@ -1883,7 +1875,7 @@ class Assembler
     // by wangqing, 2013-11-08
     void movss(const Register &src, const FloatRegister &dest) {
         mtc1(src, dest);
-        cvtds(dest, dest);
+        //cvtds(dest, dest);
     }
 
     void movss(const FloatRegister &src, const Operand &dest) {
@@ -2737,22 +2729,35 @@ class Assembler
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
     }
+
+    //rewrite by weizhenwei, 2013.11.06
     void notl(const Register &reg) {
       //  masm.notl_r(reg.code());
-      mcss.not32(reg.code());
+      //mcss.not32(reg.code());
+      masm.nor(reg.code(), reg.code(), zero.code());
     }
+
+    //rewrite by weizhenwei, 2013.11.06
     void shrl(const Imm32 imm, const Register &dest) {
 //ok        masm.shrl_i8r(imm.value, dest.code());
-        mcss.urshift32(mTrustedImm32(imm.value), dest.code());
+        //mcss.urshift32(mTrustedImm32(imm.value), dest.code());
+        masm.srl(dest.code(), dest.code(), imm.value);
     }
+
+    //rewrite by weizhenwei, 2013.11.06
     void shll(const Imm32 imm, const Register &dest) {
 //ok        masm.shll_i8r(imm.value, dest.code());
-        mcss.lshift32(mTrustedImm32(imm.value), dest.code());
+        //mcss.lshift32(mTrustedImm32(imm.value), dest.code());
+        masm.sll(dest.code(), dest.code(), imm.value);
     }
+
+    //rewrite by weizhenwei, 2013.11.06
     void sarl(const Imm32 imm, const Register &dest) {
 //ok        masm.sarl_i8r(imm.value, dest.code());
-        mcss.rshift32(mTrustedImm32(imm.value), dest.code());
+        //mcss.rshift32(mTrustedImm32(imm.value), dest.code());
+        masm.sra(dest.code(), dest.code(), imm.value);
     }
+
     void shrl_cl(const Register &dest) {
      //  masm.shrl_CLr(dest.code());
          mcss.urshift32(mRegisterID(t8.code()), dest.code());

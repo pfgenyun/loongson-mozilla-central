@@ -2268,7 +2268,6 @@ public:
         if (address.offset >= -32768 && address.offset <= 32767
             && !m_fixedWidth) {
             m_assembler.lwc1(dest, address.base, address.offset);
-            //m_assembler.cvtds(dest, dest);
         } else {
             /*
                 lui     addrTemp, (offset + 0x8000) >> 16
@@ -2279,7 +2278,6 @@ public:
             m_assembler.lui(addrTempRegister, (address.offset + 0x8000) >> 16);
             m_assembler.addu(addrTempRegister, addrTempRegister, address.base);
             m_assembler.lwc1(dest, addrTempRegister, address.offset);
-            //m_assembler.cvtds(dest, dest);
         }
     }
 
@@ -2296,7 +2294,6 @@ public:
             m_assembler.sll(addrTempRegister, address.index, address.scale);
             m_assembler.addu(addrTempRegister, addrTempRegister, address.base);
             m_assembler.lwc1(dest, addrTempRegister, address.offset);
-            //m_assembler.cvtds(dest, dest);
         } else {
             /*
                 sll     addrTemp, address.index, address.scale
@@ -2312,7 +2309,6 @@ public:
             m_assembler.addu(addrTempRegister, addrTempRegister,
                              immTempRegister);
             m_assembler.lwc1(dest, addrTempRegister, address.offset);
-            //m_assembler.cvtds(dest, dest);
         }
     }
     
@@ -2327,7 +2323,6 @@ public:
             cvt.d.s     dest, dest
         */
         m_assembler.lwc1(dest, addrTempRegister, 0);
-        //m_assembler.cvtds(dest, dest);
     }
 /*
     DataLabelPtr loadFloat(const void* address, FPRegisterID dest)
@@ -2653,7 +2648,7 @@ public:
 
     void subFloat(Address src, FPRegisterID dest)
     {
-        loadDouble(src, fpTempRegister);
+        loadFloat(src, fpTempRegister);
         m_assembler.subs(dest, dest, fpTempRegister);
     }
 

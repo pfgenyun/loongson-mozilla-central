@@ -1468,8 +1468,7 @@ class MacroAssemblerMIPS : public Assembler
         }
     }
     void moveDouble(FloatRegister src, FloatRegister dest) {
-        // Use movapd instead of movsd to avoid dependencies.
-        movapd(src, dest);
+        movsd(src, dest);
     }
     void zeroDouble(FloatRegister reg) {
         xorpd(reg, reg);
@@ -1561,8 +1560,7 @@ class MacroAssemblerMIPS : public Assembler
         }
     }
     void moveFloat(FloatRegister src, FloatRegister dest) {
-        // Use movaps instead of movss to avoid dependencies.
-        movaps(src, dest);
+        movss(src, dest);
     }
 
     // Checks whether a double is representable as a 32-bit integer. If so, the
