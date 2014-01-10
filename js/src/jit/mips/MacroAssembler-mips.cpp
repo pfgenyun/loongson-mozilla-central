@@ -103,7 +103,6 @@ MacroAssemblerMIPS::loadConstantFloat32(float f, const FloatRegister &dest)
         return;
 //    masm.movss_mr(reinterpret_cast<const void *>(flt->uses.prev()), dest.code());
    //	mcss.loadFloat(reinterpret_cast<void *>(flt->uses.prev()), dest.code());
-    //flt->uses.setPrev(masm.size());
     //author:huangwenjun date:2013-12-23
     //flt->uses.setPrev(masm.size());
     mov(&(flt->uses), addrTempRegister);
@@ -118,7 +117,6 @@ MacroAssemblerMIPS::addConstantFloat32(float f, const FloatRegister &dest)
         return;
 //    masm.addss_mr(reinterpret_cast<const void *>(flt->uses.prev()), dest.code()); // need to modify. by wangqing
     //mcss.addFloat(reinterpret_cast<const void *>(flt->uses.prev()), dest.code()); 
-    //flt->uses.setPrev(masm.size());
     //author:huangwenjun date:2013-12-23
     //flt->uses.setPrev(masm.size());
     mov(&(flt->uses), addrTempRegister);
@@ -416,7 +414,6 @@ MacroAssemblerMIPS::callWithABI(void *fun, Result result)
 {
     uint32_t stackAdjust;
     callWithABIPre(&stackAdjust);
-    //ma_call(ImmWord(uintptr_t(fun)));
     ma_call(ImmPtr(fun));
     callWithABIPost(stackAdjust, result);
 }

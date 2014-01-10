@@ -145,6 +145,19 @@ namespace JSC {
         m_buffer.putInt64Unchecked(u.u64);
     }
     
+    // add by wangqing, 2014-01-10
+    void MIPSAssembler::FloatConstant(float f)
+    {
+        m_buffer.ensureSpace(sizeof(float));
+        union {
+           uint32_t u32;
+           float f;
+        } u;
+        u.f = f;
+        m_buffer.putIntUnchecked(u.u32);
+    }
+
+    
     //author:huangwenjun date:2013-12-23
     void MIPSAssembler::linkCall(void* code, JmpSrc from, void* to)
     {

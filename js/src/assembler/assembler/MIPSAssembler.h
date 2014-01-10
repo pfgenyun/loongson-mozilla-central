@@ -961,6 +961,9 @@ public:
 
     //author:huangwenjun date:2013-12-23
     void doubleConstant(double d);
+    
+    // by wangqing, 2014-01-10
+    void FloatConstant(float f);
 
     // by wangqing
     void linkBranch(JmpSrc from, JmpDst to);

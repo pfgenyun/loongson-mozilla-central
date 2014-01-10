@@ -1600,9 +1600,8 @@ class Assembler
     // author: huangwenjun date:2013-12-23 need check
     //New function
     void writeFloatConstant(float f, Label *label) {
-        JS_ASSERT(0);
-//        label->bind(masm.size());
-//        masm.floatConstant(f);
+        label->bind(masm.size());
+        masm.FloatConstant(f);
     }
 
     void movl(const Imm32 &imm32, const Register &dest) {
@@ -1896,6 +1895,7 @@ class Assembler
           case Operand::MEM_SCALE:
 //ok            masm.movss_rm(src.code(), dest.disp(), dest.base(), dest.index(), dest.scale());
             mcss.storeFloat(src.code(), mBaseIndex(dest.base(), dest.index(), mScale(dest.scale()), dest.disp()));
+            break;
           case Operand::MEM_ADDRESS32:
             mcss.storeFloat(src.code(), dest.address());
             break;
