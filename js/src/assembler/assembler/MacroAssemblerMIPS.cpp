@@ -63,7 +63,7 @@ MacroAssemblerMIPS::branch32(Condition cond, RegisterID left, RegisterID right)
         m_assembler.slt(cmpTempRegister, right, left);
         return branchNotEqual(cmpTempRegister, MIPSRegisters::zero);
     }
-    if (cond == GreaterThanOrEqual) {
+    if (cond == GreaterThanOrEqual || cond == NotSigned) {
         m_assembler.slt(cmpTempRegister, left, right);
         return branchEqual(cmpTempRegister, MIPSRegisters::zero);
     }

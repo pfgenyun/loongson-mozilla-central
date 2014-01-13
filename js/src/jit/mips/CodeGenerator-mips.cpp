@@ -147,6 +147,7 @@ CodeGeneratorMIPS::emitBranch(Assembler::DoubleCondition cond,
         jumpToBlock(mirTrue);
     }
 }
+
 void
 CodeGeneratorMIPS::emitSet(Assembler::DoubleCondition cond, const FloatRegister &lhs,
         const FloatRegister &rhs, const Register &dest, Assembler::NaNCond ifNaN) {
@@ -165,8 +166,7 @@ CodeGeneratorMIPS::emitSet(Assembler::DoubleCondition cond, const FloatRegister 
 
         if (ifNaN != Assembler::NaN_HandledByCond) {
             Label noNaN;
-           //j(Assembler::NoParity, &noNaN);
-           JS_ASSERT(0);
+           masm.j(Assembler::NoParity, &noNaN);
            masm.branchDouble(Assembler::DoubleOrdered, lhs, rhs, &noNaN);
             if (ifNaN == Assembler::NaN_IsTrue)
                 masm.movl(Imm32(1), dest);
@@ -313,14 +313,12 @@ CodeGeneratorMIPS::visitCompareD(LCompareD *comp)
     FloatRegister rhs = ToFloatRegister(comp->right());
 
     Assembler::DoubleCondition cond = JSOpToDoubleCondition(comp->mir()->jsop());
-
-    Assembler::NaNCond nanCond = Assembler::NaNCondFromDoubleCondition(cond);
-    if (comp->mir()->operandsAreNeverNaN())
-        nanCond = Assembler::NaN_HandledByCond;
-
     //masm.compareDouble(cond, lhs, rhs);
-    //masm.emitSet(Assembler::ConditionFromDoubleCondition(cond), ToRegister(comp->output()), nanCond);
-    emitSet(cond, lhs,rhs, ToRegister(comp->output()), nanCond);
+    //masm.emitSet(Assembler::ConditionFromDoubleCondition(cond), ToRegister(comp->output()),
+    //Assembler::NaNCondFromDoubleCondition(cond));
+    //by weizhenwei, 2013.11.07
+    emitSet(cond, lhs, rhs, ToRegister(comp->output()),
+            Assembler::NaNCondFromDoubleCondition(cond));
     return true;
 }
 
@@ -339,7 +337,7 @@ CodeGeneratorMIPS::visitCompareF(LCompareF *comp)
 
     //masm.compareFloat(cond, lhs, rhs);
     //masm.emitSet(Assembler::ConditionFromDoubleCondition(cond), ToRegister(comp->output()), nanCond);
-    emitSet(cond, lhs,rhs, ToRegister(comp->output()), nanCond);
+    emitSet(cond, lhs, rhs, ToRegister(comp->output()), nanCond);
     return true;
 }
 

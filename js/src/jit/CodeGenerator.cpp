@@ -3949,6 +3949,7 @@ CodeGenerator::visitAbsI(LAbsI *ins)
 
     JS_ASSERT(input == ToRegister(ins->output()));
     masm.test32(input, input);
+
     masm.j(Assembler::NotSigned, &positive);
 
     // by wangqing, 2013-11-19
