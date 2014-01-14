@@ -973,11 +973,12 @@ class MacroAssemblerMIPS : public Assembler
         subl(Imm32(0x80000000), src);
 
         // Now src is [-2^31, 2^31-1] - int range, but not the same value.
-        convertInt32ToDouble(src, dest);
+        cvtsi2sd(src, dest);
 
         // dest is now a double with the int range.
         // correct the double value by adding 0x80000000.
-        addConstantDouble(2147483648.0, dest);
+        static const double NegativeOne = 2147483648.0;
+        addsd(Operand(&NegativeOne), dest);
     }
 
     // Note: this function clobbers the source register.
