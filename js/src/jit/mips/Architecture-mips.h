@@ -133,6 +133,9 @@ public:
 
     static const uint32_t AllocatableMask = AllMask & ~NonAllocatableMask;
 
+    //2014-1-13
+    static const uint32_t AllocatableMaskV0 = (1 << JSC::MIPSRegisters::v0);
+
     typedef JSC::MacroAssembler::RegisterID RegisterID;
 };
 
