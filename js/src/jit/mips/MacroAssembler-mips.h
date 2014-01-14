@@ -1692,6 +1692,7 @@ class MacroAssemblerMIPS : public Assembler
             // If the register we're defining is a single byte register,
             // take advantage of the setCC instruction
             setCC(cond, dest);
+            movzbl(dest, dest);
 
             if (ifNaN != Assembler::NaN_HandledByCond) {
                 Label noNaN;
@@ -1703,7 +1704,6 @@ class MacroAssemblerMIPS : public Assembler
             Label ifFalse;
 
             if (ifNaN == Assembler::NaN_IsFalse)
-                ASSERT(0);
             // Note a subtlety here: FLAGS is live at this point, and the
             // mov interface doesn't guarantee to preserve FLAGS. Use
             // movl instead of mov, because the movl instruction
@@ -1711,7 +1711,7 @@ class MacroAssemblerMIPS : public Assembler
             movl(Imm32(1), dest);
             j(cond, &end);
             if (ifNaN == Assembler::NaN_IsTrue)
-                ASSERT(0);
+                j(Assembler::Parity, &end);
             bind(&ifFalse);
             mov(ImmWord(0), dest);
 

@@ -2916,8 +2916,12 @@ CodeGenerator::emitObjectOrStringResultChecks(LInstruction *lir, MDefinition *mi
     JS_ASSERT(lir->numDefs() == 1);
     Register output = ToRegister(lir->getDef(0));
 
+#ifdef JS_CPU_MIPS
+    GeneralRegisterSet regs(GeneralRegisterSet::AllV0());
+#else
     GeneralRegisterSet regs(GeneralRegisterSet::All());
-    regs.take(output);
+#endif
+    regs.take(output);    //2014-1-13
 
     Register temp = regs.takeAny();
     masm.push(temp);
@@ -2947,17 +2951,27 @@ CodeGenerator::emitObjectOrStringResultChecks(LInstruction *lir, MDefinition *mi
     }
 
     // Check that we have a valid GC pointer.
+    
     if (gen->info().executionMode() != ParallelExecution) {
         saveVolatile();
         masm.setupUnalignedABICall(2, temp);
         masm.loadJSContext(temp);
         masm.passABIArg(temp);
         masm.passABIArg(output);
+#ifdef JS_CPU_MIPS
+        Register scratch = regs.takeAny();
+        masm.mov(output, scratch);
+#endif
+
         masm.callWithABINoProfiling(mir->type() == MIRType_Object
                                     ? JS_FUNC_TO_DATA_PTR(void *, AssertValidObjectPtr)
                                     : JS_FUNC_TO_DATA_PTR(void *, AssertValidStringPtr));
+#ifdef JS_CPU_MIPS
+        masm.mov(scratch, output);
+#endif
         restoreVolatile();
     }
+    
 
     masm.bind(&done);
     masm.pop(temp);
@@ -3099,7 +3113,7 @@ CodeGenerator::generateBody()
                 return false;
 
 #ifdef DEBUG
-            if (!emitDebugResultChecks(*iter))
+            if (!emitDebugResultChecks(*iter))    //2014-1-13
                 return false;
 #endif
         }
