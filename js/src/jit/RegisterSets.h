@@ -318,6 +318,11 @@ class TypedRegisterSet
     MOZ_CONSTEXPR TypedRegisterSet(const TypedRegisterSet<T> &set) : bits_(set.bits_)
     { }
 
+#ifdef JS_CPU_MIPS
+    static inline TypedRegisterSet AllV0() {
+        return TypedRegisterSet(T::Codes::AllocatableMaskV0 | T::Codes::AllocatableMask);
+    }
+#endif
     static inline TypedRegisterSet All() {
         return TypedRegisterSet(T::Codes::AllocatableMask);
     }
