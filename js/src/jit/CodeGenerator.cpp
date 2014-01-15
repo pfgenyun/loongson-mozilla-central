@@ -3969,10 +3969,11 @@ CodeGenerator::visitAbsI(LAbsI *ins)
     // by wangqing, 2013-11-19
     // for neg32 only INT_MIN will overflow
 #ifdef JS_CPU_MIPS
-       masm.movl(input, cmpTempRegister);
-       masm.movl(Imm32(0x80000000), cmpTemp2Register);
+    masm.movl(input, cmpTempRegister);
+    masm.movl(Imm32(0x80000000), cmpTemp2Register);
 #endif
     masm.neg32(input);
+
 #ifdef JS_CPU_MIPS
     if (ins->snapshot() && !bailoutIf(Assembler::Equal, ins->snapshot()))
 #else
