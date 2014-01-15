@@ -2961,8 +2961,8 @@ public:
 #endif
     }
 	
-	// add by wangqing, 2014-01-07
-	void zeroFloat(FPRegisterID dest)
+    // add by wangqing, 2014-01-07
+    void zeroFloat(FPRegisterID dest)
     {
         m_assembler.mtc1(MIPSRegisters::zero, dest);
     }

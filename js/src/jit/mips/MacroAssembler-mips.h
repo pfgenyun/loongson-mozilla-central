@@ -987,11 +987,12 @@ class MacroAssemblerMIPS : public Assembler
         subl(Imm32(0x80000000), src);
 
         // Do it the GCC way
-        convertInt32ToFloat32(src, dest);
+        cvtsi2ss(src, dest);
 
         // dest is now a double with the int range.
         // correct the double value by adding 0x80000000.
-        addConstantFloat32(2147483648.f, dest);
+        static const float NegativeOne = 2147483648.f;
+        addss(Operand(&NegativeOne), dest);
     }
 
     void inc64(AbsoluteAddress dest) {
@@ -1357,28 +1358,25 @@ class MacroAssemblerMIPS : public Assembler
         // specially in modern CPUs, for this purpose. See sections 8.14, 9.8,
         // 10.8, 12.9, 13.16, 14.14, and 15.8 of Agner's Microarchitecture
         // document.
-        zeroDouble(dest);
+        //zeroDouble(dest);
         cvtsi2sd(src, dest);
     }
     void convertInt32ToDouble(const Address &src, FloatRegister dest) {
-        convertInt32ToDouble(Operand(src), dest);
+        cvtsi2sd(Operand(src), dest);
     }
     void convertInt32ToDouble(const Operand &src, FloatRegister dest) {
         // Clear the output register first to break dependencies; see above;
-        zeroDouble(dest);
-        cvtsi2sd(Operand(src), dest);
+        cvtsi2sd(src, dest);
     }
     void convertInt32ToFloat32(const Register &src, const FloatRegister &dest) {
         // Clear the output register first to break dependencies; see above;
-        zeroFloat32(dest);
         cvtsi2ss(src, dest);
     }
     void convertInt32ToFloat32(const Address &src, FloatRegister dest) {
-        convertInt32ToFloat32(Operand(src), dest);
+        cvtsi2ss(Operand(src), dest);
     }
     void convertInt32ToFloat32(const Operand &src, FloatRegister dest) {
         // Clear the output register first to break dependencies; see above;
-        zeroFloat32(dest);
         cvtsi2ss(src, dest);
     }
     Condition testDoubleTruthy(bool truthy, const FloatRegister &reg) {
@@ -1504,7 +1502,8 @@ class MacroAssemblerMIPS : public Assembler
         cvtsd2ss(src, dest);
     }
     void moveFloatAsDouble(const Register &src, FloatRegister dest) {
-        movd(src, dest);
+        //movd(src, dest);
+        movss(src, dest);
         cvtss2sd(dest, dest);
     }
     // add by wangqing. 2013-12-25
@@ -1521,7 +1520,7 @@ class MacroAssemblerMIPS : public Assembler
         cvtss2sd(dest, dest);
     }
     void loadFloatAsDouble(const Operand &src, FloatRegister dest) {
-        loadFloat(src, dest);
+        movss(src, dest);
         cvtss2sd(dest, dest);
     }
     void loadFloat(const Address &src, FloatRegister dest) {
@@ -1605,7 +1604,8 @@ class MacroAssemblerMIPS : public Assembler
                                bool negativeZeroCheck = true)
     {
         cvttss2si(src, dest);
-        convertInt32ToFloat32(dest, ScratchFloatReg);
+        cvtsi2ss(dest, ScratchFloatReg);
+        //convertInt32ToFloat32(dest, ScratchFloatReg);
         //ucomiss(src, ScratchFloatReg);
         //j(Assembler::Parity, fail);
         //j(Assembler::NotEqual, fail);
