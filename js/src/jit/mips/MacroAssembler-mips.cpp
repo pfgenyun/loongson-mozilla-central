@@ -386,7 +386,7 @@ MacroAssemblerMIPS::callWithABIPre(uint32_t *stackAdjust)
         //TODO
         testl(sp, Imm32(StackAlignment - 1));
         j(Equal, &good);
-        breakpoint();
+        breakpoint();   //2014-1-14
         bind(&good);
     }
 #endif
@@ -471,7 +471,7 @@ MacroAssemblerMIPS::handleFailureWithHandlerTail()
     Label finally;
     Label return_;
     Label bailout;
-
+    
     loadPtr(Address(sp, offsetof(ResumeFromException, kind)), t6);
     branch32(Assembler::Equal, t6, Imm32(ResumeFromException::RESUME_ENTRY_FRAME), &entryFrame);
     branch32(Assembler::Equal, t6, Imm32(ResumeFromException::RESUME_CATCH), &catch_);
@@ -524,7 +524,8 @@ MacroAssemblerMIPS::handleFailureWithHandlerTail()
     // the bailout tail stub.
     bind(&bailout);
     loadPtr(Address(sp, offsetof(ResumeFromException, bailoutInfo)), t8);
-    movl(Imm32(BAILOUT_RETURN_OK), t6);
+    movl(Imm32(BAILOUT_RETURN_OK), ReturnReg);//2014-1-15 huangwenjun bailoutStub
+    //movl(Imm32(BAILOUT_RETURN_OK), t6);
     jmp(Operand(sp, offsetof(ResumeFromException, target)));
 }
 
