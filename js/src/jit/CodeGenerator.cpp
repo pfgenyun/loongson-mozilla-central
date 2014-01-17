@@ -4967,9 +4967,15 @@ CodeGenerator::visitNotV(LNotV *lir)
         ifFalsy = ifFalsyLabel.addr();
     }
 
+#ifdef JS_CPU_MIPS
+    testValueTruthy(ToValue(lir, LNotV::Input), lir->temp1(), lir->temp2(),
+                          ToFloatRegister(lir->tempFloat()),
+                          ifTruthy, ifFalsy, ool);
+#else
     testValueTruthyKernel(ToValue(lir, LNotV::Input), lir->temp1(), lir->temp2(),
                           ToFloatRegister(lir->tempFloat()),
                           ifTruthy, ifFalsy, ool);
+#endif
 
     Label join;
     Register output = ToRegister(lir->output());

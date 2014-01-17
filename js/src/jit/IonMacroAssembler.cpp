@@ -316,7 +316,7 @@ MacroAssembler::PopRegsInMaskIgnore(RegisterSet set, RegisterSet ignore)
     }
     JS_ASSERT(diffF == 0);
 
-#if defined(JS_CPU_X86) || defined(JS_CPU_X64) || defined(JS_CPU_MIPS)
+#if defined(JS_CPU_X86) || defined(JS_CPU_X64)
     // On x86, use pop to pop the integer registers, if we're not going to
     // ignore any slots, as it's fast on modern hardware and it's a small
     // instruction.

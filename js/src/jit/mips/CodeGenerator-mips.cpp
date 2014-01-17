@@ -385,7 +385,7 @@ CodeGeneratorMIPS::visitNotF(LNotF *ins)
     //masm.xorps(ScratchFloatReg, ScratchFloatReg);
     //masm.compareFloat(Assembler::DoubleEqualOrUnordered, opd, ScratchFloatReg);
     //masm.emitSet(Assembler::Equal, ToRegister(ins->output()), nanCond);
-    masm.zerod(ScratchFloatReg);
+    masm.zeros(ScratchFloatReg);
     emitSet(Assembler::DoubleEqualOrUnordered, opd, ScratchFloatReg,
             ToRegister(ins->output()), nanCond);
     return true;
@@ -471,11 +471,11 @@ class BailoutJump {
   public:
     BailoutJump(Assembler::Condition cond) : cond_(cond)
     { }
-//#ifdef JS_CPU_X86
+#ifdef JS_CPU_X86
     void operator()(MacroAssembler &masm, uint8_t *code) const {
         masm.j(cond_, ImmPtr(code), Relocation::HARDCODED);
     }
-//#endif
+#endif
     void operator()(MacroAssembler &masm, Label *label) const {
         masm.j(cond_, label);
     }
@@ -487,11 +487,11 @@ class BailoutLabel {
   public:
     BailoutLabel(Label *label) : label_(label)
     { }
-//#ifdef JS_CPU_X86
+#ifdef JS_CPU_X86
     void operator()(MacroAssembler &masm, uint8_t *code) const {
         masm.retarget(label_, ImmPtr(code), Relocation::HARDCODED);
     }
-//#endif
+#endif
     void operator()(MacroAssembler &masm, Label *label) const {
         masm.retarget(label_, label);
     }
@@ -525,7 +525,7 @@ CodeGeneratorMIPS::bailout(const T &binder, LSnapshot *snapshot)
     JS_ASSERT_IF(frameClass_ != FrameSizeClass::None() && deoptTable_,
                  frameClass_.frameSize() == masm.framePushed());
 
-//#ifdef JS_CPU_X86
+#ifdef JS_CPU_X86
     // On x64, bailout tables are pointless, because 16 extra bytes are
     // reserved per external jump, whereas it takes only 10 bytes to encode a
     // a non-table based bailout.
@@ -533,7 +533,7 @@ CodeGeneratorMIPS::bailout(const T &binder, LSnapshot *snapshot)
         binder(masm, deoptTable_->raw() + snapshot->bailoutId() * BAILOUT_TABLE_ENTRY_SIZE);
         return true;
     }
-//#endif
+#endif
 
     // We could not use a jump table, either because all bailout IDs were
     // reserved, or a jump table is not optimal for this frame size or
@@ -1265,21 +1265,18 @@ CodeGeneratorMIPS::visitModPowTwoI(LModPowTwoI *ins)
     Register lhs = ToRegister(ins->getOperand(0));
     int32_t shift = ins->shift();
 
-    Label negative;
+    Label negative, done;
 
-    if (ins->mir()->canBeNegativeDividend()) {
-        // Switch based on sign of the lhs.
-        // Positive numbers are just a bitmask
-        masm.branchTest32(Assembler::Signed, lhs, lhs, &negative);
+    // Switch based on sign of the lhs.
+    // Positive numbers are just a bitmask
+    masm.branchTest32(Assembler::Signed, lhs, lhs, &negative);
+    {
+        masm.andl(Imm32((1 << shift) - 1), lhs);
+        masm.jump(&done);
     }
 
-    masm.andl(Imm32((1 << shift) - 1), lhs);
-
-    if (ins->mir()->canBeNegativeDividend()) {
-        Label done;
-        masm.jump(&done);
-
-        // Negative numbers need a negate, bitmask, negate
+    // Negative numbers need a negate, bitmask, negate
+    {
         masm.bind(&negative);
         // visitModI has an overflow check here to catch INT_MIN % -1, but
         // here the rhs is a power of 2, and cannot be -1, so the check is not generated.
@@ -1288,10 +1285,10 @@ CodeGeneratorMIPS::visitModPowTwoI(LModPowTwoI *ins)
         masm.negl(lhs);
         if (!ins->mir()->isTruncated() && !bailoutIf(Assembler::Zero, ins->snapshot()))
             return false;
-        masm.bind(&done);
     }
-    return true;
 
+    masm.bind(&done);
+    return true;
 }
 
 class ModOverflowCheck : public OutOfLineCodeBase<CodeGeneratorMIPS>
@@ -1704,7 +1701,6 @@ CodeGeneratorMIPS::visitMathF(LMathF *math)
     return true;
 }
 
-// New function
 bool
 CodeGeneratorMIPS::visitFloor(LFloor *lir)
 {
@@ -1812,76 +1808,6 @@ CodeGeneratorMIPS::visitFloorF(LFloorF *lir)
     }
     return true;
 }
-
-//bool
-//CodeGeneratorMIPS::visitRound(LRound *lir)
-//{
-//    FloatRegister input = ToFloatRegister(lir->input());
-//    FloatRegister temp = ToFloatRegister(lir->temp());
-//    FloatRegister scratch = ScratchFloatReg;
-//    Register output = ToRegister(lir->output());
-//
-//    Label negative, end;
-//
-//    // Load 0.5 in the temp register.
-//    masm.loadConstantDouble(0.5, temp);
-//
-//    // Branch to a slow path for negative inputs. Doesn't catch NaN or -0.
-//    masm.xorpd(scratch, scratch);
-//    masm.branchDouble(Assembler::DoubleLessThan, input, scratch, &negative);
-//
-//    // Bail on negative-zero.
-//    Assembler::Condition bailCond = masm.testNegativeZero(input, output);
-//    if (!bailoutIf(bailCond, lir->snapshot()))
-//        return false;
-//
-//    // Input is non-negative. Add 0.5 and truncate, rounding down. Note that we
-//    // have to add the input to the temp register (which contains 0.5) because
-//    // we're not allowed to modify the input register.
-//    masm.addsd(input, temp);
-//
-//    masm.cvttsd2si(temp, output);
-//    masm.cmp32(output, Imm32(0x7fffffff));
-//    if (!bailoutIf(Assembler::Equal, lir->snapshot()))
-//        return false;
-//
-//    masm.jump(&end);
-//
-//
-//    // Input is negative, but isn't -0.
-//    masm.bind(&negative);
-//
-//    { 
-//        masm.addsd(input, temp);
-//
-//        // Round toward -Infinity without the benefit of ROUNDSD.
-//        {
-//            // If input + 0.5 >= 0, input is a negative number >= -0.5 and the result is -0.
-//            masm.compareDouble(Assembler::DoubleGreaterThanOrEqual, temp, scratch);
-//            if (!bailoutIf(Assembler::DoubleGreaterThanOrEqual, lir->snapshot()))
-//                return false;
-//
-//            // Truncate and round toward zero.
-//            // This is off-by-one for everything but integer-valued inputs.
-//            masm.cvttsd2si(temp, output);
-//            masm.cmp32(output, Imm32(0x7fffffff));
-//            if (!bailoutIf(Assembler::Equal, lir->snapshot()))
-//                return false;
-//
-//            // Test whether the truncated double was integer-valued.
-//            masm.convertInt32ToDouble(output, scratch);
-//            masm.branchDouble(Assembler::DoubleEqualOrUnordered, temp, scratch, &end);
-//
-//            // Input is not integer-valued, so we rounded off-by-one in the
-//            // wrong direction. Correct by subtraction.
-//            masm.subl(Imm32(1), output);
-//            // Cannot overflow: output was already checked against INT_MIN.
-//        }
-//    }
-//
-//    masm.bind(&end);
-//    return true;
-//}
 
 // Old visitRound version, by weizhenwei, 2013.12.27
 bool
@@ -2905,13 +2831,13 @@ CodeGeneratorMIPS::visitOutOfLineTruncate(OutOfLineTruncate *ool)
         //masm.ucomisd(input, ScratchFloatReg);
         //masm.j(Assembler::Parity, &fail);
         //by weizhenwei, 2013.11.05
-		masm.zerod(ScratchFloatReg);                                          
-		masm.branchDouble(Assembler::DoubleUnordered, input, ScratchFloatReg, &fail);
+	masm.zerod(ScratchFloatReg);                                          
+	masm.branchDouble(Assembler::DoubleUnordered, input, ScratchFloatReg, &fail);
 
         {
             Label positive;
             //masm.j(Assembler::Above, &positive);
-			masm.branchDouble(Assembler::DoubleGreaterThan, input, ScratchFloatReg, &positive);
+	    masm.branchDouble(Assembler::DoubleGreaterThan, input, ScratchFloatReg, &positive);
 
             masm.loadConstantDouble(4294967296.0, temp);
             Label skip;
@@ -2930,8 +2856,8 @@ CodeGeneratorMIPS::visitOutOfLineTruncate(OutOfLineTruncate *ool)
         //masm.j(Assembler::Parity, &fail);
         //masm.j(Assembler::Equal, ool->rejoin());
         //by weizhenwei, 2013.11.05
-		masm.branchDouble(Assembler::DoubleUnordered, temp, ScratchFloatReg, &fail);
-		masm.branchDouble(Assembler::DoubleEqual, temp, ScratchFloatReg, ool->rejoin());
+	masm.branchDouble(Assembler::DoubleUnordered, temp, ScratchFloatReg, &fail);
+	masm.branchDouble(Assembler::DoubleEqual, temp, ScratchFloatReg, ool->rejoin());
     }
 
     masm.bind(&fail);
@@ -2971,13 +2897,13 @@ CodeGeneratorMIPS::visitOutOfLineTruncateFloat32(OutOfLineTruncateFloat32 *ool)
         //masm.xorps(ScratchFloatReg, ScratchFloatReg);
         //masm.ucomiss(input, ScratchFloatReg);
         //masm.j(Assembler::Parity, &fail);
-		masm.zeros(ScratchFloatReg);                                          
-		masm.branchDouble(Assembler::DoubleUnordered, input, ScratchFloatReg, &fail);
+	masm.zeros(ScratchFloatReg);                                          
+	masm.branchFloat(Assembler::DoubleUnordered, input, ScratchFloatReg, &fail);
 
         {
             Label positive;
             //masm.j(Assembler::Above, &positive);
-			masm.branchDouble(Assembler::DoubleGreaterThan, input, ScratchFloatReg, &positive);
+	    masm.branchFloat(Assembler::DoubleGreaterThan, input, ScratchFloatReg, &positive);
 
             masm.loadConstantFloat32(4294967296.f, temp);
             Label skip;
@@ -2995,8 +2921,8 @@ CodeGeneratorMIPS::visitOutOfLineTruncateFloat32(OutOfLineTruncateFloat32 *ool)
         //masm.ucomiss(temp, ScratchFloatReg);
         //masm.j(Assembler::Parity, &fail);
         //masm.j(Assembler::Equal, ool->rejoin());
-		masm.branchDouble(Assembler::DoubleUnordered, temp, ScratchFloatReg, &fail);
-		masm.branchDouble(Assembler::DoubleEqual, temp, ScratchFloatReg, ool->rejoin());
+	masm.branchFloat(Assembler::DoubleUnordered, temp, ScratchFloatReg, &fail);
+	masm.branchFloat(Assembler::DoubleEqual, temp, ScratchFloatReg, ool->rejoin());
     }
 
     masm.bind(&fail);
