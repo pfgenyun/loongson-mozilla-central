@@ -509,7 +509,6 @@ GenerateBailoutThunk(JSContext *cx, MacroAssembler &masm, uint32_t frameClass)
     masm.push(Imm32(0));
     // Push the bailout table number.
     masm.push(Imm32(frameClass));
-
     // The current stack pointer is the first argument to ion::Bailout.
     masm.movl(sp, t6);
 
@@ -524,12 +523,12 @@ GenerateBailoutThunk(JSContext *cx, MacroAssembler &masm, uint32_t frameClass)
     
     masm.callWithABI(JS_FUNC_TO_DATA_PTR(void *, Bailout));
 
-    masm.pop(s1);
+    masm.pop(t8);
+
     // Common size of stuff we've pushed.
     const uint32_t BailoutDataSize = sizeof(void *) * 2 + // frameClass and padding
                                    sizeof(double) * FloatRegisters::Total +
                                    sizeof(void *) * Registers::Total;
-
     // Remove both the bailout frame and the topmost Ion frame's stack.
     if (frameClass == NO_FRAME_SIZE_CLASS_ID) {
         // We want the frameSize. Stack is:
@@ -538,9 +537,9 @@ GenerateBailoutThunk(JSContext *cx, MacroAssembler &masm, uint32_t frameClass)
         //    frameSize
         //    ... bailoutFrame ...
         masm.addl(Imm32(BailoutDataSize), sp);
-        masm.pop(t8);
+        masm.pop(s1);
         masm.addl(Imm32(sizeof(uint32_t)), sp);
-        masm.addl(t8, sp);
+        masm.addl(s1, sp);
     } else {
         // Stack is:
         //    ... frame ...
@@ -562,7 +561,7 @@ IonCode *
 JitRuntime::generateBailoutTable(JSContext *cx, uint32_t frameClass)
 {
     MacroAssembler masm;
-
+    //masm.breakpoint();
     Label bailout;
     for (size_t i = 0; i < BAILOUT_TABLE_SIZE; i++)
         masm.call(&bailout);
