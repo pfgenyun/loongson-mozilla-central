@@ -878,6 +878,10 @@ class MacroAssemblerMIPS : public Assembler
     }
 
     void loadConstantDouble(double d, const FloatRegister &dest);
+    void loadStaticDouble(const double *dp, const FloatRegister &dest){
+        movsd(dp, dest);
+    }
+
     void addConstantDouble(double d, const FloatRegister &dest);
     void loadConstantFloat32(float f, const FloatRegister &dest);
     void addConstantFloat32(float f, const FloatRegister &dest);
