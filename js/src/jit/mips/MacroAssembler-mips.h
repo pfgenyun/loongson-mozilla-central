@@ -1110,6 +1110,30 @@ class MacroAssemblerMIPS : public Assembler
         ASSERT(0);
     }
 
+    //by weizhenwei, 2014.01.29
+    void branchFloatImpl(DoubleCondition cond, const FloatRegister &lhs,
+                      const FloatRegister &rhs, Label *label)
+    {
+        JmpSrc j;
+        if (cond & DoubleConditionBitInvert) {
+            j = mcss.branchFloat(static_cast<JSC::MacroAssemblerMIPS::DoubleCondition>(cond),
+                    rhs.code(), lhs.code()).m_jmp;
+        } else {
+            j = mcss.branchFloat(static_cast<JSC::MacroAssemblerMIPS::DoubleCondition>(cond),
+                    lhs.code(), rhs.code()).m_jmp;
+        }
+
+        if (label->bound()) {
+            // The jump can be immediately patched to the correct destination.
+            masm.linkJump(j, JmpDst(label->offset()));
+        } else {
+            // Thread the jump list through the unpatched jump targets.
+            JmpSrc prev = JmpSrc(label->use(j.offset()));
+            masm.setNextJump(j, prev);
+        }
+    //    return j;
+    }
+
     //by weizhenwei, 2013.12.24
     void branchDoubleImpl(DoubleCondition cond, const FloatRegister &lhs,
                       const FloatRegister &rhs, Label *label)
@@ -1185,19 +1209,19 @@ class MacroAssemblerMIPS : public Assembler
     {
         if (cond == DoubleEqual) {
             Label unordered;
-            branchDoubleImpl(Assembler::DoubleUnordered, lhs, rhs,  &unordered);
-            branchDoubleImpl(Assembler::DoubleEqual, lhs, rhs, label);
+            branchFloatImpl(Assembler::DoubleUnordered, lhs, rhs,  &unordered);
+            branchFloatImpl(Assembler::DoubleEqual, lhs, rhs, label);
             bind(&unordered);
             return;
         }
         if (cond == DoubleNotEqualOrUnordered) {
-            branchDoubleImpl(Assembler::DoubleNotEqual, lhs, rhs, label);
-            branchDoubleImpl(Assembler::DoubleUnordered, lhs, rhs, label);
+            branchFloatImpl(Assembler::DoubleNotEqual, lhs, rhs, label);
+            branchFloatImpl(Assembler::DoubleUnordered, lhs, rhs, label);
             return;
         }
 
         JS_ASSERT(!(cond & DoubleConditionBitSpecial));
-        branchDoubleImpl(cond, lhs, rhs, label);
+        branchFloatImpl(cond, lhs, rhs, label);
     }
 
     void move32(const Imm32 &imm, const Register &dest) {
@@ -1613,8 +1637,8 @@ class MacroAssemblerMIPS : public Assembler
         //ucomiss(src, ScratchFloatReg);
         //j(Assembler::Parity, fail);
         //j(Assembler::NotEqual, fail);
-        branchDouble(Assembler::DoubleUnordered, src, ScratchFloatReg, fail);
-        branchDouble(Assembler::DoubleNotEqual, src, ScratchFloatReg, fail);
+        branchFloatImpl(Assembler::DoubleUnordered, src, ScratchFloatReg, fail);
+        branchFloatImpl(Assembler::DoubleNotEqual, src, ScratchFloatReg, fail);
 
         // Check for -0
         if (negativeZeroCheck) {

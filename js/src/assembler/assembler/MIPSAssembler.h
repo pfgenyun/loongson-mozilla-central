@@ -778,10 +778,24 @@ public:
         emitInst(0x46200031 | (fs << OP_SH_FS) | (ft << OP_SH_FT));
         copDelayNop();
     }
+	
+	// by xsb: fix me
+    void cus(FPRegisterID fs, FPRegisterID ft)
+    {
+        emitInst(0x46000031 | (fs << OP_SH_FS) | (ft << OP_SH_FT));
+        copDelayNop();
+    }
+
 
     void ceqd(FPRegisterID fs, FPRegisterID ft)
     {
         emitInst(0x46200032 | (fs << OP_SH_FS) | (ft << OP_SH_FT));
+        copDelayNop();
+    }
+
+	void ceqs(FPRegisterID fs, FPRegisterID ft)
+    {
+        emitInst(0x46000032 | (fs << OP_SH_FS) | (ft << OP_SH_FT));
         copDelayNop();
     }
 
@@ -792,21 +806,48 @@ public:
         copDelayNop();
     }
 
+	//by weizhenwei, 2013.10.29
+    void cseqs(FPRegisterID fs, FPRegisterID ft)
+    {
+        emitInst(0x4600003a | (fs << OP_SH_FS) | (ft << OP_SH_FT));
+        copDelayNop();
+    }
+
     void cngtd(FPRegisterID fs, FPRegisterID ft)
     {
         emitInst(0x4620003f | (fs << OP_SH_FS) | (ft << OP_SH_FT));
         copDelayNop();
     }
+	
+	void cngts(FPRegisterID fs, FPRegisterID ft)
+    {
+        emitInst(0x4600003f | (fs << OP_SH_FS) | (ft << OP_SH_FT));
+        copDelayNop();
+    }
+
 
     void cnged(FPRegisterID fs, FPRegisterID ft)
     {
         emitInst(0x4620003d | (fs << OP_SH_FS) | (ft << OP_SH_FT));
         copDelayNop();
     }
+	
+	void cnges(FPRegisterID fs, FPRegisterID ft)
+    {
+        emitInst(0x4600003d | (fs << OP_SH_FS) | (ft << OP_SH_FT));
+        copDelayNop();
+    }
+
 
     void cltd(FPRegisterID fs, FPRegisterID ft)
     {
         emitInst(0x4620003c | (fs << OP_SH_FS) | (ft << OP_SH_FT));
+        copDelayNop();
+    }
+	
+	void clts(FPRegisterID fs, FPRegisterID ft)
+    {
+        emitInst(0x4600003c | (fs << OP_SH_FS) | (ft << OP_SH_FT));
         copDelayNop();
     }
 
@@ -816,15 +857,33 @@ public:
         copDelayNop();
     }
 
+	void cles(FPRegisterID fs, FPRegisterID ft)
+    {
+        emitInst(0x4600003e | (fs << OP_SH_FS) | (ft << OP_SH_FT));
+        copDelayNop();
+    }
+
     void cueqd(FPRegisterID fs, FPRegisterID ft)
     {
         emitInst(0x46200033 | (fs << OP_SH_FS) | (ft << OP_SH_FT));
         copDelayNop();
     }
 
+	void cueqs(FPRegisterID fs, FPRegisterID ft)
+    {
+        emitInst(0x46000033 | (fs << OP_SH_FS) | (ft << OP_SH_FT));
+        copDelayNop();
+    }
+
     void coled(FPRegisterID fs, FPRegisterID ft)
     {
         emitInst(0x46200036 | (fs << OP_SH_FS) | (ft << OP_SH_FT));
+        copDelayNop();
+    }
+	
+	void coles(FPRegisterID fs, FPRegisterID ft)
+    {
+        emitInst(0x46000036 | (fs << OP_SH_FS) | (ft << OP_SH_FT));
         copDelayNop();
     }
 
@@ -834,15 +893,33 @@ public:
         copDelayNop();
     }
 
+	void colts(FPRegisterID fs, FPRegisterID ft)
+    {
+        emitInst(0x46000034 | (fs << OP_SH_FS) | (ft << OP_SH_FT));
+        copDelayNop();
+    }
+
     void culed(FPRegisterID fs, FPRegisterID ft)
     {
         emitInst(0x46200037 | (fs << OP_SH_FS) | (ft << OP_SH_FT));
         copDelayNop();
     }
 
+	void cules(FPRegisterID fs, FPRegisterID ft)
+    {
+        emitInst(0x46000037 | (fs << OP_SH_FS) | (ft << OP_SH_FT));
+        copDelayNop();
+    }
+
     void cultd(FPRegisterID fs, FPRegisterID ft)
     {
         emitInst(0x46200035 | (fs << OP_SH_FS) | (ft << OP_SH_FT));
+        copDelayNop();
+    }
+
+	void cults(FPRegisterID fs, FPRegisterID ft)
+    {
+        emitInst(0x46000035 | (fs << OP_SH_FS) | (ft << OP_SH_FT));
         copDelayNop();
     }
 

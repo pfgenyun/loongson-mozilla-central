@@ -2921,6 +2921,69 @@ public:
 
         return Jump();
     }
+	
+	Jump branchFloat(DoubleCondition cond, FPRegisterID left, FPRegisterID right)
+    {
+        if (cond == DoubleUnordered) {
+            m_assembler.cus(left, right);
+            return branchTrue();
+        }
+        if (cond == DoubleOrdered) {
+            m_assembler.cus(left, right);
+            return branchFalse();
+        }
+        if (cond == DoubleEqual) {
+            m_assembler.cseqs(left, right);
+            return branchTrue();
+        }
+        if (cond == DoubleNotEqual) {
+            m_assembler.cueqs(left, right);
+            return branchFalse(); // false
+        }
+        if (cond == DoubleGreaterThan) {
+            m_assembler.cngts(left, right);
+            return branchFalse(); // false
+        }
+        if (cond == DoubleGreaterThanOrEqual) {
+            m_assembler.cnges(left, right);
+            return branchFalse(); // false
+        }
+        if (cond == DoubleLessThan) {
+            m_assembler.clts(left, right);
+            return branchTrue();
+        }
+        if (cond == DoubleLessThanOrEqual) {
+            m_assembler.cles(left, right);
+            return branchTrue();
+        }
+        if (cond == DoubleEqualOrUnordered) {
+            m_assembler.cueqs(left, right);
+            return branchTrue();
+        }
+        if (cond == DoubleNotEqualOrUnordered) {
+            m_assembler.cseqs(left, right);
+            return branchFalse(); // false
+        }
+        if (cond == DoubleGreaterThanOrUnordered) {
+            m_assembler.coles(left, right);
+            return branchFalse(); // false
+        }
+        if (cond == DoubleGreaterThanOrEqualOrUnordered) {
+            m_assembler.colts(left, right);
+            return branchFalse(); // false
+        }
+        if (cond == DoubleLessThanOrUnordered) {
+            m_assembler.cults(left, right);
+            return branchTrue();
+        }
+        if (cond == DoubleLessThanOrEqualOrUnordered) {
+            m_assembler.cules(left, right);
+            return branchTrue();
+        }
+        ASSERT(0);
+
+        return Jump();
+    }
 
     // Truncates 'src' to an integer, and places the resulting 'dest'.
     // If the result is not representable as a 32 bit value, branch.
