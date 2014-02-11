@@ -630,10 +630,10 @@ class Assembler
         * author: wangqing
         * date: 2010-10-18
         * 
-        * lui immTemp.code(), word.value>>16
-        * ori immTemp.code(), immTemp.code(), word.value&0x0000ffff
+        * lui immTemp, word.value>>16
+        * ori immTemp, immTemp, word.value&0x0000ffff
         * addiu sp, sp, -4
-        * sw immTemp.code(), sp, 0
+        * sw immTemp, sp, 0
         *
         */
         CodeOffsetLabel label = CodeOffsetLabel(size());
@@ -656,8 +656,8 @@ class Assembler
          * author: wangqing
          * date: 2013-10-21
          *
-         * lui dest.code(), word.value >> 16
-         * ori dest.code(), dest.code(), word.value & 0x0000ffff
+         * lui dest, word.value >> 16
+         * ori dest, dest, word.value & 0x0000ffff
          */
         CodeOffsetLabel label = CodeOffsetLabel(size());
         lui(dest, (uint32_t)(word.value) >> 16);
@@ -757,7 +757,7 @@ class Assembler
            addu(addrTempRegister, addrTempRegister, dest.base());
            lui(immTempRegister, dest.disp() >> 16);
            ori(immTempRegister, immTempRegister, dest.disp() & 0x0000ffff);
-           addu(addrTempRegister, addrTempRegister, immTempRegister.code());
+           addu(addrTempRegister, addrTempRegister, immTempRegister);
            lui(immTempRegister, (uint32_t)ptr.value >> 16);
            ori(immTempRegister, immTempRegister, (uint32_t)ptr.value & 0x0000ffff);
            writeDataRelocation(ptr);
@@ -813,7 +813,7 @@ class Assembler
         // instruction stream.
         int offset = label->prev();
         lui(dest, offset >> 16);
-        ori(dest.code(), dest.code(), offset&0x0000ffff);
+        ori(dest, dest, offset&0x0000ffff);
         label->setPrev(masm.size());
     }
 
@@ -911,9 +911,9 @@ class Assembler
         * author: wangqing
         * date: 2013-10-23
         *
-        * move lhs.code(), cmpTemp.code()
-        * lui cmpTemp2.code(), rhs.value >> 16
-        * ori cmpTemp2.code(), cmpTemp2.code(), rhs.value & 0x0000ffff
+        * move lhs, cmpTemp
+        * lui cmpTemp2, rhs.value >> 16
+        * ori cmpTemp2, cmpTemp2, rhs.value & 0x0000ffff
         */
        move(lhs,cmpTempRegister);
        CodeOffsetLabel label = CodeOffsetLabel(size());
@@ -1127,8 +1127,8 @@ class Assembler
          * author: wangqing
          * date: 2013-10-23
          *
-         * lui dest.code(), imm.value >> 16
-         * ori dest.code(), dest.code(), imm.value&0x0000ffff
+         * lui dest, imm.value >> 16
+         * ori dest, dest, imm.value&0x0000ffff
          */
         CodeOffsetLabel label = CodeOffsetLabel(size());
         lui(dest, imm.value >> 16);
@@ -1146,9 +1146,9 @@ class Assembler
          * author: wangqing
          * date: 2013-10-23
          *
-         * lui addrTemp.code(), addr >> 16
-         * ori addrTemp.code(), addr & 0x0000ffff
-         * lw dest.code(), addrTemp.code(), 0
+         * lui addrTemp, addr >> 16
+         * ori addrTemp, addr & 0x0000ffff
+         * lw dest, addrTemp 0
          */
         CodeOffsetLabel label = CodeOffsetLabel(size());
         lui(addrTempRegister, (int)addr >> 16);
@@ -1189,7 +1189,7 @@ class Assembler
          *
          * lui addrTemp, addr >> 16
          * ori addrTemp, addrTemp, addr & 0x0000ffff
-         * sw src.code(), addrTemp, 0
+         * sw src, addrTemp, 0
          */
         
         CodeOffsetLabel label = CodeOffsetLabel(size());
@@ -1241,7 +1241,7 @@ class Assembler
          CodeOffsetLabel label = CodeOffsetLabel(size());
          lui(addrTempRegister, src.offset >> 16);
          ori(addrTempRegister, addrTempRegister, src.offset & 0x0000ffff);
-         addu(addrTempRegister, addrTempRegister, src.base.code());
+         addu(addrTempRegister, addrTempRegister, src.base);
          lb(dest, addrTempRegister, 0);
          return label;
     }
@@ -1696,6 +1696,7 @@ class Assembler
     }
 
     // movsd and movss are only provided in load/store form since the
+    // movsd and movss are only provided in load/store form since the
     // register-to-register form has different semantics (it doesn't clobber
     // the whole output register) and isn't needed currently.
     // New function
@@ -1829,9 +1830,9 @@ class Assembler
          * author: wangqing
          * date: 2013-12-24
          *
-         * lui addrTemp.code(), src.addr >> 16
-         * ori addrTemp.code(), src.addr & 0x0000ffff
-         * lw dest.code(), addrTemp.code(), 0
+         * lui addrTemp, src.addr >> 16
+         * ori addrTemp, src.addr & 0x0000ffff
+         * lw dest, addrTemp, 0
          */
         CodeOffsetLabel label = CodeOffsetLabel(size());
         lui(addrTempRegister, (int)src.addr >> 16);
@@ -2728,7 +2729,7 @@ class Assembler
           default:
             MOZ_ASSUME_UNREACHABLE("unexpected operand kind");
         }
-    }
+    } 
 
     //rewrite by weizhenwei, 2013.11.06
     void notl(const Register &reg) {

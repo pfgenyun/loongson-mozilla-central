@@ -601,5 +601,5 @@ MacroAssemblerMIPS::enterOsr(Register calleeToken, Register code) {
 //ok    //arm : ma_callIonHalfPush
 //ok    call(code);
     ma_callIonHalfPush(code);//获取到当前的pc+7，然后压栈，跳转至code处；
-    addl(Imm32(sizeof(uintptr_t) * 2), sp);
+    //addl(Imm32(sizeof(uintptr_t) * 2), sp);
 }

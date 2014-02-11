@@ -84,7 +84,13 @@ class CodeGeneratorMIPS : public CodeGeneratorShared
     void emitBranch(Assembler::DoubleCondition cond, const FloatRegister &lhs,
 		const FloatRegister &rhs, MBasicBlock *ifTrue, MBasicBlock *ifFalse,
                 Assembler::NaNCond ifNaN = Assembler::NaN_HandledByCond);
+    void emitBranchF(Assembler::DoubleCondition cond, const FloatRegister &lhs,
+		const FloatRegister &rhs, MBasicBlock *ifTrue, MBasicBlock *ifFalse,
+                Assembler::NaNCond ifNaN = Assembler::NaN_HandledByCond);
     void emitSet(Assembler::DoubleCondition cond, const FloatRegister &lhs,
+        const FloatRegister &rhs, const Register &dest,
+        Assembler::NaNCond ifNaN = Assembler::NaN_HandledByCond);
+    void emitSetF(Assembler::DoubleCondition cond, const FloatRegister &lhs,
         const FloatRegister &rhs, const Register &dest,
         Assembler::NaNCond ifNaN = Assembler::NaN_HandledByCond);
 

@@ -98,6 +98,8 @@ CodeGeneratorMIPS::emitBranch(Assembler::Condition cond, MBasicBlock *mirTrue,
     }
 }
 
+
+
 // By weizhenwei, 2013.12.23
 // From jit/shared/CodeGenerator-shared.cpp
 void
@@ -118,6 +120,35 @@ CodeGeneratorMIPS::jumpToBlockDouble(MBasicBlock *mir, const FloatRegister &lhs,
         masm.branchDouble(cond, lhs, rhs, mir->lir()->label());
     }
 }
+
+//by wangqing, 2014-02-11
+void
+CodeGeneratorMIPS::emitBranchF(Assembler::DoubleCondition cond,
+        const FloatRegister &lhs, const FloatRegister &rhs,
+        MBasicBlock *mirTrue, MBasicBlock *mirFalse, Assembler::NaNCond ifNaN)
+{
+    LBlock *ifTrue = mirTrue->lir();
+    LBlock *ifFalse = mirFalse->lir();
+
+    if (ifNaN == Assembler::NaN_IsFalse) {
+        masm.branchFloat(Assembler::DoubleUnordered, lhs, rhs, ifFalse->label());
+    } else if (ifNaN == Assembler::NaN_IsTrue) {
+        masm.branchFloat(Assembler::DoubleUnordered, lhs, rhs, ifTrue->label());
+    } else {
+        masm.branchFloat(Assembler::DoubleUnordered, lhs, rhs, ifFalse->label());
+    }
+
+
+    if (isNextBlock(ifFalse)) {
+        masm.branchFloat(cond, lhs, rhs, ifTrue->label());
+    } else {
+        masm.branchFloat(masm.InvertDoubleCondition(cond), lhs, rhs, ifFalse->label());
+        if (!isNextBlock(ifTrue))
+            masm.jmp(ifTrue->label());
+    }
+}
+
+
 void
 CodeGeneratorMIPS::emitBranch(Assembler::DoubleCondition cond,
         const FloatRegister &lhs, const FloatRegister &rhs,
@@ -199,6 +230,58 @@ CodeGeneratorMIPS::emitSet(Assembler::DoubleCondition cond, const FloatRegister 
     }
 }
 
+// add by wangqing, 2014-02-11
+void
+CodeGeneratorMIPS::emitSetF(Assembler::DoubleCondition cond, const FloatRegister &lhs,
+        const FloatRegister &rhs, const Register &dest, Assembler::NaNCond ifNaN) {
+
+
+    if (GeneralRegisterSet(Registers::SingleByteRegs).has(dest)) {
+        // If the register we're defining is a single byte register,
+        // take advantage of the setCC instruction
+        //setCC(cond, dest);
+        //movzxbl(dest, dest);
+        Label setDest;
+        masm.movl(Imm32(1), dest);
+        masm.branchFloat(cond, lhs, rhs, &setDest);
+        masm.xorl(dest, dest);
+        masm.bind(&setDest);
+
+        if (ifNaN != Assembler::NaN_HandledByCond) {
+            Label noNaN;
+           masm.j(Assembler::NoParity, &noNaN);
+           masm.branchFloat(Assembler::DoubleOrdered, lhs, rhs, &noNaN);
+            if (ifNaN == Assembler::NaN_IsTrue)
+                masm.movl(Imm32(1), dest);
+            else
+                masm.xorl(dest, dest);
+            masm.bind(&noNaN);
+        }
+    } else {
+        Label end;
+        Label ifFalse;
+
+        if (ifNaN == Assembler::NaN_IsFalse) {
+            //j(Assembler::Parity, &ifFalse);
+            JS_ASSERT(0);
+            masm.branchFloat(Assembler::DoubleUnordered, lhs, rhs, &ifFalse);
+        }
+        masm.movl(Imm32(1), dest);
+        //j(cond, &end);
+        masm.branchFloat(cond, lhs, rhs, &end);
+        if (ifNaN == Assembler::NaN_IsTrue) {
+           //j(Assembler::Parity, &end);
+           JS_ASSERT(0);
+           masm.branchFloat(Assembler::DoubleUnordered, lhs, rhs, &end);
+        }
+          
+        masm.bind(&ifFalse);
+        masm.xorl(dest, dest);
+
+        masm.bind(&end);
+    }
+}
+
 bool
 CodeGeneratorMIPS::visitDouble(LDouble *ins)
 {
@@ -259,8 +342,8 @@ CodeGeneratorMIPS::visitTestFAndBranch(LTestFAndBranch *test)
     //masm.xorps(ScratchFloatReg, ScratchFloatReg);
     //masm.ucomiss(ToFloatRegister(opd), ScratchFloatReg);
     //TODO: check if this is equavilent with Double, weizhenwei, 2013.12.25
-    masm.zerod(ScratchFloatReg);
-    emitBranch(Assembler::DoubleNotEqual, ToFloatRegister(opd),
+    masm.zeros(ScratchFloatReg);
+    emitBranchF(Assembler::DoubleNotEqual, ToFloatRegister(opd),
             ScratchFloatReg, test->ifTrue(), test->ifFalse());
     return true;
 }
@@ -336,8 +419,8 @@ CodeGeneratorMIPS::visitCompareF(LCompareF *comp)
         nanCond = Assembler::NaN_HandledByCond;
 
     //masm.compareFloat(cond, lhs, rhs);
-    //masm.emitSet(Assembler::ConditionFromDoubleCondition(cond), ToRegister(comp->output()), nanCond);
-    emitSet(cond, lhs, rhs, ToRegister(comp->output()), nanCond);
+    //masm.emitSetF(Assembler::ConditionFromDoubleCondition(cond), ToRegister(comp->output()), nanCond);
+    emitSetF(cond, lhs, rhs, ToRegister(comp->output()), nanCond);
     return true;
 }
 
@@ -386,7 +469,7 @@ CodeGeneratorMIPS::visitNotF(LNotF *ins)
     //masm.compareFloat(Assembler::DoubleEqualOrUnordered, opd, ScratchFloatReg);
     //masm.emitSet(Assembler::Equal, ToRegister(ins->output()), nanCond);
     masm.zeros(ScratchFloatReg);
-    emitSet(Assembler::DoubleEqualOrUnordered, opd, ScratchFloatReg,
+    emitSetF(Assembler::DoubleEqualOrUnordered, opd, ScratchFloatReg,
             ToRegister(ins->output()), nanCond);
     return true;
 }
@@ -425,7 +508,7 @@ CodeGeneratorMIPS::visitCompareFAndBranch(LCompareFAndBranch *comp)
 
     //masm.compareFloat(cond, lhs, rhs);
     //emitBranch(Assembler::ConditionFromDoubleCondition(cond), comp->ifTrue(), comp->ifFalse(), nanCond);
-    emitBranch(cond, lhs, rhs, comp->ifTrue(), comp->ifFalse(), nanCond);
+    emitBranchF(cond, lhs, rhs, comp->ifTrue(), comp->ifFalse(), nanCond);
     return true;
 }
 
@@ -2279,7 +2362,7 @@ CodeGeneratorMIPS::visitCompareVAndBranch(LCompareVAndBranch *lir)
 
     JS_ASSERT(mir->jsop() == JSOP_EQ || mir->jsop() == JSOP_STRICTEQ ||
               mir->jsop() == JSOP_NE || mir->jsop() == JSOP_STRICTNE);
-
+    
     MBasicBlock *notEqual = (cond == Assembler::Equal) ? lir->ifFalse() : lir->ifTrue();
 
     masm.cmp32(lhs.typeReg(), rhs.typeReg());
