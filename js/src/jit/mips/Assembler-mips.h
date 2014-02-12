@@ -2865,13 +2865,21 @@ class Assembler
     // New function
     void movzbl(const Register &src, const Register &dest) {
         //masm.movzbl_rr(src.code(), dest.code());
-    	mcss.zeroExtend32ToPtr(src.code(),dest.code());//mipsÖÐ²¢Ã»ÓÐÊµÏÖÀ©Õ¹£¡
+    	//mcss.zeroExtend32ToPtr(src.code(),dest.code());
+        if (src != dest) {
+            movl(src, dest);
+        }
+        andl(Imm32(0xff), dest);
     }
 
     void movzxbl(const Register &src, const Register &dest)
     { 
     	//masm.movzbl_rr(src.code(), dest.code());
-    	mcss.zeroExtend32ToPtr(src.code(),dest.code());//mipsÖÐ²¢Ã»ÓÐÊµÏÖÀ©Õ¹£¡
+    	//mcss.zeroExtend32ToPtr(src.code(),dest.code());
+        if (src != dest) {
+            movl(src, dest);
+        }
+        andl(Imm32(0xff), dest);
     }
 
     void idiv(Register divisor) {
